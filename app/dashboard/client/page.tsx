@@ -1703,7 +1703,7 @@ function ProfileTab() {
   const [resetSent,    setResetSent]    = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
-  // Load all data on mount
+  // Load all profile data on mount
   useEffect(() => {
     if (!user?.id) return;
     Promise.all([

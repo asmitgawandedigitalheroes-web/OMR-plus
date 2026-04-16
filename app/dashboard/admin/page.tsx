@@ -30,6 +30,7 @@ const AdminNavIcons = {
 interface AdminUser {
   id: string;
   full_name: string | null;
+  email?: string | null;
   role: string;
   onboarding_completed: boolean;
   created_at: string;
@@ -242,30 +243,32 @@ function AdminModal({ open, onClose, title, maxWidth = 560, children }: {
 function UsersTab({ users, coaches, onRefresh }: { users: AdminUser[]; coaches: AdminCoach[]; onRefresh: () => void }) {
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
+
+  // Assign Coach modal
   const [assigning, setAssigning] = useState<AdminUser | null>(null);
   const [assignCoachId, setAssignCoachId] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [assignError, setAssignError] = useState('');
+
+  // Edit Client modal
+  const [editingClient, setEditingClient] = useState<AdminUser | null>(null);
 
   const filtered = users.filter(u =>
     u.role === 'client' &&
-    (!search || (u.full_name ?? '').toLowerCase().includes(search.toLowerCase()))
+    (!search || (u.full_name ?? '').toLowerCase().includes(search.toLowerCase()) || (u.email ?? '').toLowerCase().includes(search.toLowerCase()))
   );
-
-  const [assignError, setAssignError] = useState('');
 
   const assignCoach = async () => {
     if (!assignCoachId || !assigning) return;
-    setSaving(true);
+    setAssignSaving(true);
     setAssignError('');
     try {
-      // Remove any existing assignment for this client first
       const { error: delError } = await supabase
         .from('trainer_client_assignments')
         .delete()
         .eq('client_id', assigning.id);
       if (delError) throw new Error(delError.message);
 
-      // Insert the new assignment
       const { error: insError } = await supabase
         .from('trainer_client_assignments')
         .insert({ client_id: assigning.id, trainer_id: assignCoachId });
@@ -277,13 +280,8 @@ function UsersTab({ users, coaches, onRefresh }: { users: AdminUser[]; coaches: 
     } catch (err: unknown) {
       setAssignError(err instanceof Error ? err.message : 'Failed to assign coach');
     } finally {
-      setSaving(false);
+      setAssignSaving(false);
     }
-  };
-
-  const changeRole = async (userId: string, newRole: string) => {
-    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
-    if (!error) onRefresh();
   };
 
   return (
@@ -293,7 +291,7 @@ function UsersTab({ users, coaches, onRefresh }: { users: AdminUser[]; coaches: 
           <p dir="auto" className="ds-section-title">{t('admin.usersTab')}</p>
           <p dir="ltr" className="ds-section-sub">{filtered.length} {t('admin.clients')}</p>
         </div>
-        <input className="ds-input admin-search-input" style={{ width: 220 }} placeholder="Search by name…" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="ds-input admin-search-input" style={{ width: 220 }} placeholder="Search by name or email…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       {filtered.length === 0 ? (
@@ -325,7 +323,10 @@ function UsersTab({ users, coaches, onRefresh }: { users: AdminUser[]; coaches: 
                         <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.2)', fontSize: 11, fontWeight: 700, color: '#C9A84C' }}>
                           {u.full_name?.[0]?.toUpperCase() ?? 'U'}
                         </div>
-                        <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)' }}>{u.full_name ?? t('admin.unnamed')}</p>
+                        <div>
+                          <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)' }}>{u.full_name ?? t('admin.unnamed')}</p>
+                          {u.email && <p style={{ fontSize: '0.71rem', color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{u.email}</p>}
+                        </div>
                       </div>
                     </td>
                     <td><span className={u.subscription_status === 'active' ? 'ds-badge-green' : 'ds-badge-gray'} style={{ whiteSpace: 'nowrap' }}>{u.subscription_status === 'active' ? t('admin.statusActive') : (u.subscription_status ?? t('admin.statusFree'))}</span></td>
@@ -333,13 +334,22 @@ function UsersTab({ users, coaches, onRefresh }: { users: AdminUser[]; coaches: 
                     <td style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem' }}>{u.assigned_coach ?? t('admin.noCoachAssigned')}</td>
                     <td style={{ color: 'rgba(255,255,255,0.32)', fontSize: '0.75rem' }}>{new Date(u.created_at).toLocaleDateString()}</td>
                     <td>
-                      <button
-                        className="ds-btn-outline"
-                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.73rem' }}
-                        onClick={() => { setAssigning(u); setAssignCoachId(u.assigned_coach ? (coaches.find(c => c.full_name === u.assigned_coach)?.id ?? '') : ''); setAssignError(''); }}
-                      >
-                        {t('admin.assignCoach')}
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button
+                          className="ds-btn-gold"
+                          style={{ padding: '0.38rem 0.75rem', fontSize: '0.72rem' }}
+                          onClick={() => setEditingClient(u)}
+                        >
+                          Edit Client
+                        </button>
+                        <button
+                          className="ds-btn-outline"
+                          style={{ padding: '0.38rem 0.75rem', fontSize: '0.72rem' }}
+                          onClick={() => { setAssigning(u); setAssignCoachId(u.assigned_coach ? (coaches.find(c => c.full_name === u.assigned_coach)?.id ?? '') : ''); setAssignError(''); }}
+                        >
+                          {t('admin.assignCoach')}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 </React.Fragment>
@@ -375,15 +385,518 @@ function UsersTab({ users, coaches, onRefresh }: { users: AdminUser[]; coaches: 
               <div style={{ marginTop: '0.85rem', padding: '0.65rem 0.9rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', borderRadius: 9, fontSize: '0.78rem', color: 'rgba(239,68,68,0.88)' }}>{assignError}</div>
             )}
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-              <button className="ds-btn-gold" style={{ flex: 1 }} disabled={saving || !assignCoachId} onClick={assignCoach}>
-                {saving ? t('admin.saving') : 'Confirm Assignment'}
+              <button className="ds-btn-gold" style={{ flex: 1 }} disabled={assignSaving || !assignCoachId} onClick={assignCoach}>
+                {assignSaving ? t('admin.saving') : 'Confirm Assignment'}
               </button>
               <button className="ds-btn-outline" onClick={() => { setAssigning(null); setAssignError(''); setAssignCoachId(''); }}>{t('admin.cancel')}</button>
             </div>
           </div>
         )}
       </AdminModal>
+
+      {/* ── Edit Client Modal ── */}
+      {editingClient && (
+        <EditClientModal
+          client={editingClient}
+          onClose={() => setEditingClient(null)}
+          onRefresh={onRefresh}
+        />
+      )}
     </div>
+  );
+}
+
+/* ─── Edit Client Modal ───────────────────────────────── */
+interface ClientSubscription {
+  id: string;
+  plan_name: string;
+  status: string;
+  price_sar: number;
+  started_at: string;
+  expires_at: string | null;
+  cancel_at_period_end: boolean;
+  cancelled_at: string | null;
+  stripe_subscription_id: string | null;
+}
+
+function EditClientModal({ client, onClose, onRefresh }: {
+  client: AdminUser;
+  onClose: () => void;
+  onRefresh: () => void;
+}) {
+  const [tab, setTab] = useState<'subscription' | 'info'>('subscription');
+
+  // Subscription state
+  const [subLoading, setSubLoading] = useState(true);
+  const [currentSub, setCurrentSub] = useState<ClientSubscription | null>(null);
+  const [plans, setPlans] = useState<PricingPlan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [durationDays, setDurationDays] = useState(30);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [removeLoading, setRemoveLoading] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(false);
+  const [subError, setSubError] = useState('');
+  const [subSuccess, setSubSuccess] = useState('');
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
+
+  // Load subscription + plans
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setSubLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+
+        // Fetch plans via admin pricing-plans API
+        const plansRes = await fetch('/api/admin/pricing-plans', { headers });
+        const plansJson = await plansRes.json() as { plans?: PricingPlan[] };
+        if (mounted) setPlans((plansJson.plans ?? []).filter((p: PricingPlan) => p.is_published));
+
+        // Fetch current subscription directly (service-role via admin data or direct query)
+        const { data: subData } = await supabase
+          .from('subscriptions')
+          .select('id, plan_name, status, price_sar, started_at, expires_at, cancel_at_period_end, cancelled_at, stripe_subscription_id')
+          .eq('user_id', client.id)
+          .in('status', ['active', 'trialing'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (mounted) setCurrentSub(subData ?? null);
+      } catch (err) {
+        console.error('[EditClientModal] load error', err);
+      } finally {
+        if (mounted) setSubLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, [client.id]);
+
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) h['Authorization'] = `Bearer ${session.access_token}`;
+    return h;
+  };
+
+  const handleAssign = async () => {
+    if (!selectedPlanId) return;
+    setAssignLoading(true);
+    setSubError('');
+    setSubSuccess('');
+    try {
+      const res = await fetch('/api/admin/subscription', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ action: 'assign', user_id: client.id, plan_id: selectedPlanId, duration_days: durationDays }),
+      });
+      const json = await res.json() as { success?: boolean; subscription?: ClientSubscription; error?: string };
+      if (!res.ok || json.error) throw new Error(json.error ?? 'Failed to assign plan');
+      setCurrentSub(json.subscription ?? null);
+      setShowPlanPicker(false);
+      setSelectedPlanId('');
+      setSubSuccess('Subscription assigned successfully.');
+      onRefresh();
+    } catch (err: unknown) {
+      setSubError(err instanceof Error ? err.message : 'Failed to assign plan');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleCancel = async (immediately: boolean) => {
+    setCancelLoading(true);
+    setSubError('');
+    setSubSuccess('');
+    try {
+      const res = await fetch('/api/admin/subscription', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ action: 'cancel', user_id: client.id, at_period_end: !immediately }),
+      });
+      const json = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok || json.error) throw new Error(json.error ?? 'Failed to cancel');
+      setCancelConfirm(false);
+      setSubSuccess(immediately ? 'Subscription cancelled immediately.' : 'Cancellation scheduled at period end.');
+      // Refresh local sub state
+      const { data } = await supabase
+        .from('subscriptions')
+        .select('id, plan_name, status, price_sar, started_at, expires_at, cancel_at_period_end, cancelled_at, stripe_subscription_id')
+        .eq('user_id', client.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setCurrentSub(data ?? null);
+      onRefresh();
+    } catch (err: unknown) {
+      setSubError(err instanceof Error ? err.message : 'Failed to cancel subscription');
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setRemoveLoading(true);
+    setSubError('');
+    setSubSuccess('');
+    try {
+      const res = await fetch('/api/admin/subscription', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ action: 'remove', user_id: client.id }),
+      });
+      const json = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok || json.error) throw new Error(json.error ?? 'Failed to remove');
+      setRemoveConfirm(false);
+      setCurrentSub(null);
+      setSubSuccess('Subscription record removed.');
+      onRefresh();
+    } catch (err: unknown) {
+      setSubError(err instanceof Error ? err.message : 'Failed to remove subscription');
+    } finally {
+      setRemoveLoading(false);
+    }
+  };
+
+  const isActive = currentSub?.status === 'active' || currentSub?.status === 'trialing';
+  const isPendingCancel = isActive && currentSub?.cancel_at_period_end;
+
+  // Style tokens
+  const card: React.CSSProperties = { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '1.15rem 1.25rem', marginBottom: '1rem' };
+  const sectionLbl: React.CSSProperties = { fontSize: '0.67rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)', marginBottom: '0.6rem' };
+  const fieldLbl: React.CSSProperties = { fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '0.3rem' };
+  const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9, padding: '0.58rem 0.8rem', fontSize: '0.83rem', color: '#fff', outline: 'none', boxSizing: 'border-box' };
+
+  return (
+    <AdminModal open onClose={onClose} title="Edit Client" maxWidth={580}>
+      {/* ── Client identity header ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.9rem 1rem', background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: 14, marginBottom: '1.25rem' }}>
+        <div style={{ width: 42, height: 42, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.3)', fontSize: 15, fontWeight: 700, color: '#C9A84C' }}>
+          {client.full_name?.[0]?.toUpperCase() ?? 'U'}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.full_name ?? 'Unnamed Client'}</p>
+          <p style={{ fontSize: '0.73rem', color: 'rgba(255,255,255,0.38)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.email ?? '—'}</p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+          <span className={isActive ? 'ds-badge-green' : 'ds-badge-gray'} style={{ whiteSpace: 'nowrap' }}>
+            {isActive ? (isPendingCancel ? 'Cancels Soon' : 'Active') : 'No Sub'}
+          </span>
+          <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.28)' }}>
+            Joined {new Date(client.created_at).toLocaleDateString('en', { month: 'short', year: 'numeric' })}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Tab switcher ── */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem', background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 4 }}>
+        {(['subscription', 'info'] as const).map(t2 => (
+          <button
+            key={t2}
+            onClick={() => setTab(t2)}
+            style={{ flex: 1, padding: '0.55rem 0', borderRadius: 7, fontSize: '0.78rem', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.18s', background: tab === t2 ? 'rgba(201,168,76,0.18)' : 'transparent', color: tab === t2 ? '#C9A84C' : 'rgba(255,255,255,0.38)', letterSpacing: '0.02em' }}
+          >
+            {t2 === 'subscription' ? 'Subscription' : 'Client Info'}
+          </button>
+        ))}
+      </div>
+
+      {/* ════════════════════════════════════ SUBSCRIPTION TAB ═══ */}
+      {tab === 'subscription' && (
+        <div>
+          {subLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[85, 65, 45].map(w => (
+                <div key={w} style={{ height: 14, borderRadius: 6, background: 'rgba(255,255,255,0.05)', width: `${w}%` }} />
+              ))}
+            </div>
+          ) : (
+            <>
+              {/* ── Current Subscription Card ── */}
+              {isActive ? (
+                <div style={{ ...card, borderColor: isPendingCancel ? 'rgba(251,191,36,0.2)' : 'rgba(74,222,128,0.18)' }}>
+                  <p style={sectionLbl}>Current Subscription</p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: isPendingCancel ? 'rgba(251,191,36,0.9)' : 'rgba(74,222,128,0.9)', flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: isPendingCancel ? 'rgba(251,191,36,0.7)' : 'rgba(74,222,128,0.7)' }}>
+                          {isPendingCancel ? 'Cancels at period end' : currentSub!.status}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginBottom: 3 }}>{currentSub!.plan_name}</p>
+                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>
+                          Started: {new Date(currentSub!.started_at).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                        {currentSub!.expires_at && (
+                          <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>
+                            {isPendingCancel ? 'Access until' : 'Renews'}: {new Date(currentSub!.expires_at).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+                      {currentSub!.stripe_subscription_id && (
+                        <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.22)', marginTop: 4, fontFamily: 'monospace' }}>
+                          Stripe: {currentSub!.stripe_subscription_id}
+                        </p>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '1.3rem', fontWeight: 800, color: '#C9A84C', letterSpacing: '-0.02em' }} dir="ltr">
+                      AED {currentSub!.price_sar}<span style={{ fontSize: '0.62rem', fontWeight: 500, color: 'rgba(255,255,255,0.3)', marginLeft: 3 }}>/mo</span>
+                    </p>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: '1rem', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => { setShowPlanPicker(v => !v); setSubError(''); setSubSuccess(''); }}
+                      style={{ padding: '0.42rem 0.9rem', borderRadius: 8, fontSize: '0.73rem', fontWeight: 700, border: '1px solid rgba(201,168,76,0.35)', background: 'transparent', color: '#C9A84C', cursor: 'pointer', transition: 'all 0.2s', letterSpacing: '0.04em' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(201,168,76,0.08)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      {showPlanPicker ? 'Hide Plans' : 'Change Plan'}
+                    </button>
+                    {!isPendingCancel && (
+                      <button
+                        onClick={() => { setCancelConfirm(true); setSubError(''); setSubSuccess(''); }}
+                        style={{ padding: '0.42rem 0.9rem', borderRadius: 8, fontSize: '0.73rem', fontWeight: 600, border: '1px solid rgba(248,113,113,0.25)', background: 'transparent', color: 'rgba(248,113,113,0.7)', cursor: 'pointer', transition: 'all 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.07)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        Cancel Subscription
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setRemoveConfirm(true); setSubError(''); setSubSuccess(''); }}
+                      style={{ padding: '0.42rem 0.9rem', borderRadius: 8, fontSize: '0.73rem', fontWeight: 600, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: 'rgba(248,113,113,0.45)', cursor: 'pointer', transition: 'all 0.2s' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.06)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      Remove Record
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* No active subscription */
+                <div style={{ ...card, textAlign: 'center', padding: '1.5rem 1rem' }}>
+                  <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.85rem' }}>
+                    <svg style={{ width: 20, height: 20, color: 'rgba(255,255,255,0.25)' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>
+                  </div>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>No active subscription</p>
+                  <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.22)', marginBottom: '1rem' }}>Assign a plan from the list below</p>
+                  <button
+                    onClick={() => setShowPlanPicker(true)}
+                    className="ds-btn-gold"
+                    style={{ fontSize: '0.78rem', padding: '0.5rem 1.2rem' }}
+                  >
+                    Assign Plan
+                  </button>
+                </div>
+              )}
+
+              {/* ── Plan Picker ── */}
+              {showPlanPicker && (
+                <div style={{ marginTop: 4, marginBottom: 4 }}>
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: '1rem' }} />
+                  <p style={sectionLbl}>Select a Plan to Assign</p>
+
+                  {/* Duration selector */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
+                    {[30, 60, 90, 180, 365].map(d => (
+                      <button
+                        key={d}
+                        onClick={() => setDurationDays(d)}
+                        style={{ padding: '0.35rem 0.75rem', borderRadius: 7, fontSize: '0.72rem', fontWeight: 600, border: `1px solid ${durationDays === d ? 'rgba(201,168,76,0.45)' : 'rgba(255,255,255,0.1)'}`, background: durationDays === d ? 'rgba(201,168,76,0.12)' : 'transparent', color: durationDays === d ? '#C9A84C' : 'rgba(255,255,255,0.38)', cursor: 'pointer', transition: 'all 0.15s' }}
+                      >
+                        {d === 365 ? '1 year' : `${d}d`}
+                      </button>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 110 }}>
+                      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>Custom:</span>
+                      <input
+                        type="number"
+                        min={1} max={3650}
+                        value={durationDays}
+                        onChange={e => setDurationDays(Math.max(1, Math.min(3650, Number(e.target.value))))}
+                        style={{ ...inp, width: 72, padding: '0.32rem 0.6rem', fontSize: '0.78rem' }}
+                      />
+                      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>days</span>
+                    </div>
+                  </div>
+
+                  {/* Plan cards */}
+                  {plans.length === 0 ? (
+                    <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.28)', textAlign: 'center', padding: '1rem 0' }}>No published plans available.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+                      {plans.map(plan => {
+                        const isCurrent = isActive && currentSub?.plan_name === plan.name;
+                        const isSelected = selectedPlanId === plan.id;
+                        return (
+                          <div
+                            key={plan.id}
+                            onClick={() => setSelectedPlanId(isSelected ? '' : plan.id)}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem', borderRadius: 12, background: isSelected ? 'rgba(201,168,76,0.07)' : 'rgba(255,255,255,0.025)', border: `1px solid ${isSelected ? 'rgba(201,168,76,0.4)' : isCurrent ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.07)'}`, cursor: 'pointer', transition: 'all 0.18s', flexWrap: 'wrap', gap: 8 }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              {/* Radio dot */}
+                              <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${isSelected ? '#C9A84C' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {isSelected && <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#C9A84C' }} />}
+                              </div>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <p style={{ fontSize: '0.88rem', fontWeight: 700, color: isSelected ? '#C9A84C' : '#fff' }}>{plan.name}</p>
+                                  {isCurrent && <span style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 999, background: 'rgba(74,222,128,0.1)', color: 'rgba(74,222,128,0.8)', border: '1px solid rgba(74,222,128,0.2)' }}>Current</span>}
+                                </div>
+                                <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+                                  Access for {durationDays === 365 ? '1 year' : `${durationDays} days`}
+                                </p>
+                              </div>
+                            </div>
+                            <p style={{ fontSize: '1.05rem', fontWeight: 800, color: isSelected ? '#C9A84C' : 'rgba(255,255,255,0.7)', letterSpacing: '-0.01em' }} dir="ltr">
+                              AED {plan.price_sar}<span style={{ fontSize: '0.62rem', fontWeight: 400, color: 'rgba(255,255,255,0.25)', marginLeft: 3 }}>/mo</span>
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <button
+                    className="ds-btn-gold"
+                    style={{ width: '100%', opacity: !selectedPlanId || assignLoading ? 0.55 : 1 }}
+                    disabled={!selectedPlanId || assignLoading}
+                    onClick={handleAssign}
+                  >
+                    {assignLoading ? (
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                        <svg style={{ animation: 'spin 0.8s linear infinite', width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                        Assigning…
+                      </span>
+                    ) : (
+                      isActive ? `Switch to ${plans.find(p => p.id === selectedPlanId)?.name ?? 'plan'}` : `Assign ${plans.find(p => p.id === selectedPlanId)?.name ?? 'Plan'}`
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Feedback messages */}
+              {subError && (
+                <div style={{ marginTop: 10, padding: '0.65rem 0.9rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', borderRadius: 9, fontSize: '0.78rem', color: 'rgba(239,68,68,0.88)' }}>{subError}</div>
+              )}
+              {subSuccess && (
+                <div style={{ marginTop: 10, padding: '0.65rem 0.9rem', background: 'rgba(74,222,128,0.07)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 9, fontSize: '0.78rem', color: 'rgba(74,222,128,0.85)' }}>{subSuccess}</div>
+              )}
+
+              {/* ── Cancel Confirmation ── */}
+              {cancelConfirm && (
+                <div style={{ marginTop: 10, padding: '1rem 1.15rem', background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 12 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(251,191,36,0.85)', marginBottom: 6 }}>Cancel this subscription?</p>
+                  <p style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.45)', marginBottom: '0.9rem', lineHeight: 1.55 }}>
+                    Choose <strong style={{ color: 'rgba(255,255,255,0.65)' }}>At Period End</strong> to keep access until {currentSub?.expires_at ? new Date(currentSub.expires_at).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' }) : 'expiry'}, or <strong style={{ color: 'rgba(255,255,255,0.65)' }}>Immediately</strong> to revoke access now.
+                  </p>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => handleCancel(false)}
+                      disabled={cancelLoading}
+                      style={{ padding: '0.5rem 1rem', borderRadius: 9, fontSize: '0.75rem', fontWeight: 700, border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: 'rgba(251,191,36,0.9)', cursor: cancelLoading ? 'not-allowed' : 'pointer', opacity: cancelLoading ? 0.7 : 1 }}
+                    >
+                      {cancelLoading ? 'Processing…' : 'At Period End'}
+                    </button>
+                    <button
+                      onClick={() => handleCancel(true)}
+                      disabled={cancelLoading}
+                      style={{ padding: '0.5rem 1rem', borderRadius: 9, fontSize: '0.75rem', fontWeight: 700, border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(248,113,113,0.1)', color: 'rgba(248,113,113,0.9)', cursor: cancelLoading ? 'not-allowed' : 'pointer', opacity: cancelLoading ? 0.7 : 1 }}
+                    >
+                      {cancelLoading ? 'Processing…' : 'Immediately'}
+                    </button>
+                    <button
+                      onClick={() => setCancelConfirm(false)}
+                      style={{ padding: '0.5rem 0.85rem', borderRadius: 9, fontSize: '0.75rem', fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}
+                    >
+                      Keep
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Remove Confirmation ── */}
+              {removeConfirm && (
+                <div style={{ marginTop: 10, padding: '1rem 1.15rem', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(239,68,68,0.85)', marginBottom: 6 }}>Remove subscription record?</p>
+                  <p style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.45)', marginBottom: '0.9rem', lineHeight: 1.55 }}>
+                    This permanently deletes the database record. This action cannot be undone.
+                  </p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleRemove}
+                      disabled={removeLoading}
+                      style={{ padding: '0.5rem 1rem', borderRadius: 9, fontSize: '0.75rem', fontWeight: 700, border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.1)', color: 'rgba(239,68,68,0.9)', cursor: removeLoading ? 'not-allowed' : 'pointer', opacity: removeLoading ? 0.7 : 1 }}
+                    >
+                      {removeLoading ? 'Removing…' : 'Yes, Remove'}
+                    </button>
+                    <button
+                      onClick={() => setRemoveConfirm(false)}
+                      style={{ padding: '0.5rem 0.85rem', borderRadius: 9, fontSize: '0.75rem', fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════ CLIENT INFO TAB ═══ */}
+      {tab === 'info' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={card}>
+            <p style={sectionLbl}>Account</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+              <div>
+                <span style={fieldLbl}>Full Name</span>
+                <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.75)' }}>{client.full_name ?? '—'}</p>
+              </div>
+              <div>
+                <span style={fieldLbl}>Email</span>
+                <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.75)', wordBreak: 'break-all' }}>{client.email ?? '—'}</p>
+              </div>
+              <div>
+                <span style={fieldLbl}>Role</span>
+                <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.75)', textTransform: 'capitalize' }}>{client.role}</p>
+              </div>
+              <div>
+                <span style={fieldLbl}>Onboarding</span>
+                <span className={client.onboarding_completed ? 'ds-badge-green' : 'ds-badge-gray'}>
+                  {client.onboarding_completed ? 'Completed' : 'Pending'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div style={card}>
+            <p style={sectionLbl}>Assignment</p>
+            <div>
+              <span style={fieldLbl}>Assigned Coach</span>
+              <p style={{ fontSize: '0.85rem', color: client.assigned_coach ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.28)' }}>
+                {client.assigned_coach ?? 'No coach assigned'}
+              </p>
+            </div>
+          </div>
+          <div style={{ padding: '0.75rem 0 0.25rem', textAlign: 'center' }}>
+            <p style={{ fontSize: '0.73rem', color: 'rgba(255,255,255,0.25)' }}>
+              To edit profile details or assign a coach, use the respective admin controls.
+            </p>
+          </div>
+        </div>
+      )}
+    </AdminModal>
   );
 }
 
@@ -3817,6 +4330,7 @@ export default function AdminDashboard() {
       const mappedUsers: AdminUser[] = profiles.map(p => ({
         id: p.id,
         full_name: p.full_name,
+        email: p.email ?? null,
         role: p.role ?? 'client',
         onboarding_completed: p.onboarding_completed ?? false,
         created_at: p.created_at,
