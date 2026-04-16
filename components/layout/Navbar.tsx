@@ -83,6 +83,17 @@ export default function Navbar() {
             </Link> */}
             <Link href="/marketplace" className="relative text-white/70 hover:text-brand-gold transition-colors underline-gold flex items-center gap-1.5">
               {t('nav.marketplace')}
+              {!hasActiveProducts && (
+                <span style={{
+                  fontSize: '0.55rem', fontWeight: 700, letterSpacing: '0.1em',
+                  textTransform: 'uppercase', padding: '0.18rem 0.45rem',
+                  borderRadius: 999, background: 'rgba(201,168,76,0.12)',
+                  color: '#C9A84C', border: '1px solid rgba(201,168,76,0.3)',
+                  lineHeight: 1, flexShrink: 0,
+                }}>
+                  Soon
+                </span>
+              )}
             </Link>
             <Link href="/pricing" className="text-white/70 hover:text-brand-gold transition-colors underline-gold">
               {t('nav.pricing')}
@@ -174,6 +185,17 @@ export default function Navbar() {
               >
                 <span className="flex items-center gap-2.5 group-hover:text-white transition-colors">
                   {t('nav.marketplace')}
+                  {!hasActiveProducts && (
+                    <span style={{
+                      fontSize: '0.55rem', fontWeight: 700, letterSpacing: '0.1em',
+                      textTransform: 'uppercase', padding: '0.18rem 0.45rem',
+                      borderRadius: 999, background: 'rgba(201,168,76,0.12)',
+                      color: '#C9A84C', border: '1px solid rgba(201,168,76,0.3)',
+                      lineHeight: 1, flexShrink: 0,
+                    }}>
+                      Soon
+                    </span>
+                  )}
                 </span>
                 <svg className="w-4 h-4 opacity-20 group-hover:opacity-50 transition-all" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />

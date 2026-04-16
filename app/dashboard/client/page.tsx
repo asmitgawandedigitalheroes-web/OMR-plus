@@ -1295,22 +1295,34 @@ function SubscriptionTab({ userId }: { userId: string }) {
       });
   },[userId]);
 
-  // Fetch invoices
+  // Fetch Stripe invoices (only when the subscription has a stripe_subscription_id)
   useEffect(()=>{
     if (!userId) return;
+    // Wait for sub to load so we know if it's Stripe-backed
+    if (loading) return;
+    if (!sub?.stripe_subscription_id) {
+      // No Stripe sub — nothing to fetch from Stripe
+      setInvoicesLoading(false);
+      return;
+    }
     setInvoicesLoading(true);
-    fetch('/api/stripe/invoices', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+      return fetch('/api/stripe/invoices', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ userId }),
+      });
     })
       .then(r => r.json())
-      .then(data => {
+      .then((data: { invoices?: typeof invoices }) => {
         if (data.invoices) setInvoices(data.invoices);
       })
       .catch(() => {})
       .finally(() => setInvoicesLoading(false));
-  },[userId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[userId, loading]);
 
   async function handleCancel() {
     if (!userId) return;
@@ -1433,13 +1445,73 @@ function SubscriptionTab({ userId }: { userId: string }) {
             </ClientModal>
           </div>
 
-          {/* Invoices Section */}
+          {/* Invoices / Receipts Section */}
           <div className="ds-card" style={{ padding:'1.5rem' }}>
             <p style={{ fontSize:'0.88rem', fontWeight:700, color:'white', marginBottom:4 }}>{t('client.sub.invoices')}</p>
             <p style={{ fontSize:'0.75rem', color:'rgba(255,255,255,0.3)', marginBottom:16 }}>{t('client.sub.invoicesSub')}</p>
 
+            {/* ── Always show a receipt for the current subscription ── */}
+            {sub && (
+              <div className="cd-invoice-row" style={{
+                display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0.75rem 1rem',
+                borderRadius:10, background:'rgba(201,168,76,0.04)', border:'1px solid rgba(201,168,76,0.14)',
+                marginBottom: invoices.length > 0 ? 10 : 0,
+              }}>
+                <div style={{ flex:1 }}>
+                  <p style={{ fontSize:'0.82rem', fontWeight:600, color:'rgba(255,255,255,0.75)' }}>
+                    {sub.plan_name as string}
+                  </p>
+                  <p style={{ fontSize:'0.7rem', color:'rgba(255,255,255,0.3)', marginTop:2 }}>
+                    {sub.started_at ? new Date(sub.started_at as string).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'}) : '—'}
+                    {sub.expires_at ? ` → ${new Date(sub.expires_at as string).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})}` : ''}
+                  </p>
+                </div>
+                <div style={{ textAlign:'right', marginRight:14 }}>
+                  <p style={{ fontSize:'0.85rem', fontWeight:700, color:'#C9A84C' }} dir="ltr">
+                    AED {String(sub.price_sar)}
+                  </p>
+                  <p style={{ fontSize:'0.65rem', color:'rgba(74,222,128,0.75)', textTransform:'capitalize', marginTop:1 }}>
+                    {sub.status as string}
+                  </p>
+                </div>
+                <a
+                  href={`/api/invoices/receipt?sub_id=${sub.id as string}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={async e => {
+                    // Attach auth token as a query param via a signed URL isn't trivial;
+                    // instead open via a fetch then blob URL so the Bearer header goes through
+                    e.preventDefault();
+                    const { data:{ session } } = await supabase.auth.getSession();
+                    const res = await fetch(`/api/invoices/receipt?sub_id=${sub.id as string}`, {
+                      headers: session?.access_token ? { Authorization:`Bearer ${session.access_token}` } : {},
+                    });
+                    if (!res.ok) { alert('Could not load receipt. Please try again.'); return; }
+                    const html = await res.text();
+                    const blob = new Blob([html], { type:'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                  }}
+                  style={{
+                    display:'inline-flex', alignItems:'center', gap:4, padding:'0.4rem 0.75rem',
+                    borderRadius:8, fontSize:'0.7rem', fontWeight:600,
+                    border:'1px solid rgba(201,168,76,0.3)', color:'#C9A84C',
+                    textDecoration:'none', transition:'all 0.2s ease', cursor:'pointer',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(201,168,76,0.07)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <svg style={{ width:13, height:13 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                  Receipt
+                </a>
+              </div>
+            )}
+
+            {/* ── Stripe invoice list (when available) ── */}
             {invoicesLoading ? (
-              <SkInline lines={3} />
+              <SkInline lines={2} />
             ) : invoices.length > 0 ? (
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {invoices.map(inv => (
@@ -1463,9 +1535,9 @@ function SubscriptionTab({ userId }: { userId: string }) {
                         {inv.status}
                       </p>
                     </div>
-                    {inv.pdf && (
+                    {(inv.pdf || inv.hosted_url) && (
                       <a
-                        href={inv.pdf}
+                        href={inv.pdf ?? inv.hosted_url ?? '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -1477,7 +1549,7 @@ function SubscriptionTab({ userId }: { userId: string }) {
                         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(201,168,76,0.07)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <svg style={{ width:13, height:13 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
                         PDF
@@ -1486,11 +1558,11 @@ function SubscriptionTab({ userId }: { userId: string }) {
                   </div>
                 ))}
               </div>
-            ) : (
+            ) : !sub ? (
               <p style={{ fontSize:'0.8rem', color:'rgba(255,255,255,0.25)', textAlign:'center', padding:'1rem 0' }}>
                 {t('client.sub.noInvoices')}
               </p>
-            )}
+            ) : null}
           </div>
         </>
       ) : (
