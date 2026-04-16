@@ -1,0 +1,262 @@
+@import "tailwindcss";
+
+/* OMR+ Brand Colors */
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  /* Brand Palette */
+  --brand-green: #1A3A2A;
+  --brand-green-light: #2A5A40;
+  --brand-gold: #C9A84C;
+  --brand-gold-light: #E8C76A;
+  --brand-black: #0A0A0A;
+  --brand-charcoal: #141414;
+  --brand-surface: #1A1A1A;
+  --brand-muted: #666666;
+  --brand-muted-light: #999999;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Brand Colors */
+  --color-brand-green: var(--brand-green);
+  --color-brand-green-light: var(--brand-green-light);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-gold-light: var(--brand-gold-light);
+  --color-brand-black: var(--brand-black);
+  --color-brand-charcoal: var(--brand-charcoal);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-muted-light: var(--brand-muted-light);
+}
+
+/* ===== SKELETON LOADER ===== */
+@keyframes sk-sweep {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.sk-base {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 0px,
+    rgba(255,255,255,0.09) 80px,
+    rgba(255,255,255,0.03) 160px
+  );
+  background-size: 800px 100%;
+  animation: sk-sweep 1.5s ease-in-out infinite;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+/* ===== ANIMATIONS ===== */
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    background-position: 0% center;
+  }
+  50% {
+    background-position: 100% center;
+  }
+}
+
+@keyframes lineGrow {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes pulseGold {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(201, 168, 76, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(201, 168, 76, 0);
+  }
+}
+
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleInOnScroll {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Animation Utility Classes */
+.animate-fade-in-left {
+  animation: fadeInLeft 0.8s ease-out forwards;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animate-slide-in-down {
+  animation: slideInDown 0.6s ease-out forwards;
+}
+
+.animate-pulse-gold {
+  animation: pulseGold 2s infinite;
+}
+
+.animate-count-up {
+  animation: countUp 0.6s ease-out forwards;
+}
+
+
+/* ===== CUSTOM COMPONENTS ===== */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans);
+}
+
+/* Premium Button Styles */
+.btn-gold {
+  @apply px-8 py-3 bg-brand-gold text-brand-black font-semibold rounded-lg transition-all duration-300 hover:bg-brand-gold-light hover:shadow-lg hover:shadow-brand-gold/30;
+}
+
+.btn-gold-outline {
+  @apply px-8 py-3 border-2 border-brand-gold text-brand-gold font-semibold rounded-lg transition-all duration-300 hover:bg-brand-gold/10 hover:border-brand-gold-light hover:shadow-lg hover:shadow-brand-gold/20;
+}
+
+/* Gradient Gold Text */
+.text-gradient-gold {
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-gold via-brand-gold-light to-brand-gold;
+}
+
+.btn-ghost {
+  @apply px-8 py-3 text-white border border-white/20 rounded-lg transition-all duration-300 hover:bg-white/10 hover:border-white/40;
+}
+
+/* Gradient Overlays */
+.gradient-overlay-left {
+  background: linear-gradient(to right, rgba(10, 10, 10, 0.8), transparent);
+}
+
+.gradient-overlay-top {
+  background: linear-gradient(to bottom, rgba(10, 10, 10, 0.6), transparent);
+}
+
+.gradient-overlay-dark {
+  background: linear-gradient(to bottom, rgba(10, 10, 10, 0.4), rgba(10, 10, 10, 0.8));
+}
+
+/* Section Titles */
+.section-title {
+  @apply text-4xl md:text-5xl font-bold text-white;
+}
+
+.section-subtitle {
+  @apply text-lg md:text-xl text-brand-muted-light;
+}
+
+/* Gold Accent Line */
+.accent-line {
+  @apply h-1 w-16 bg-gradient-to-r from-brand-gold to-brand-gold-light rounded-full;
+}
+
+.accent-line-full {
+  @apply h-0.5 w-32 bg-gradient-to-r from-brand-gold via-brand-gold-light to-transparent;
+}
+
+/* Premium Card */
+.card-premium {
+  @apply bg-brand-surface border border-white/10 rounded-xl p-6 hover:border-brand-gold/30 transition-all duration-300 hover:shadow-lg hover:shadow-brand-gold/10;
+}
+
+.card-premium-dark {
+  @apply bg-brand-charcoal border border-white/5 rounded-xl p-6 hover:border-brand-gold/50 transition-all duration-300 hover:shadow-lg hover:shadow-brand-gold/20;
+}
+
+/* Badge Styles */
+.badge-gold {
+  @apply inline-flex items-center px-4 py-1 bg-brand-gold/10 border border-brand-gold/30 text-brand-gold text-sm font-medium rounded-full;
+}
+
+.badge-accent {
+  @apply inline-flex items-center px-4 py-1 bg-brand-green/20 border border-brand-green/50 text-brand-green-light text-sm font-medium rounded-full;
+}
+
+/* Underline Animation */
+.underline-gold {
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+.underline-gold::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--brand-gold);
+  transition: width 0.3s ease;
+}
+
+.underline-gold:hover::after {
+  width: 100%;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

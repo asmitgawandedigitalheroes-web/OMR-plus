@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(find \"C:\\\\Users\\\\Vikram Gondane\\\\OneDrive\\\\Desktop\\\\Asmit\\\\cluade projects\\\\omr project\\\\omrplus-master\\\\app\\\\api\" -name \"*.ts\" -exec grep -l \"email\\\\|notification\\\\|mail\" {} \\\\;)",
+      "Bash(npm install:*)",
+      "Bash(npm list:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(node -e ':*)",
+      "Bash(find \"/c/Users/Vikram Gondane/OneDrive/Desktop/Asmit/cluade projects/omr project/omrplus-master/app\" -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) ! -path \"*/node_modules/*\" ! -path \"*/.next/*\" -exec grep -l \"stripe\" {} \\\\;)",
+      "Bash(node -e \"console.log\\('node ok'\\)\")",
+      "Bash(node generate_doc.js)",
+      "Bash(python \"C:\\\\Users\\\\Vikram Gondane\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\c0b9108c-788b-4a5b-adbf-e439e26cc799\\\\00a8be9a-b63e-46b9-862c-22a293bda3b2\\\\skills\\\\docx\\\\scripts\\\\office\\\\validate.py\" OMR_PLUS_SOFTWARE_DOCUMENTATION.docx)",
+      "Bash(ls -lh OMR_PLUS_SOFTWARE_DOCUMENTATION.*)"
+    ]
+  }
+}
