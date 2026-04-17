@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     // Look up the plan from the DB
     const { data: plan, error: planError } = await supabaseAdmin
       .from('pricing_plans')
-      .select('id, name, price_sar, stripe_price_id, is_published')
+      .select('id, name, price_sar, stripe_price_id, billing_type, is_published')
       .eq('id', planId)
       .maybeSingle();
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
-      mode: 'subscription',
+      mode: plan.billing_type === 'one_time' ? 'payment' : 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: plan.stripe_price_id, quantity: 1 }],
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,

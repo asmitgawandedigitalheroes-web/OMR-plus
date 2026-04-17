@@ -18,7 +18,7 @@ async function getPricingPlans() {
     );
     const { data } = await supabase
       .from('pricing_plans')
-      .select('id, name, description, tagline, cta_text, price_sar, features, is_featured, sort_order')
+      .select('id, name, description, tagline, cta_text, price_sar, billing_type, features, is_featured, sort_order')
       .eq('is_published', true)
       .order('sort_order', { ascending: true });
 
