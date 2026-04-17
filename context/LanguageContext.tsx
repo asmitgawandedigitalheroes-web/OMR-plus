@@ -222,6 +222,7 @@ const en: Record<string, string> = {
   'pricing.titleHighlight': 'Transparent Pricing',
   'pricing.subtitle': 'No hidden fees. No free trials. Choose the plan that fits your goals.',
   'pricing.perMonth': '/month',
+  'pricing.oneTime':  'one-time',
   'pricing.getStarted': 'Get Started',
   'pricing.popular': 'Most Popular',
   'pricing.consultation': 'Book Free Consultation',
@@ -349,11 +350,13 @@ const en: Record<string, string> = {
 
   // Coach Dashboard
   'coach.clients': 'Clients',
+  'coach.client':  'client',
   'coach.mealBuilder': 'Meal Builder',
   'coach.workoutBuilder': 'Workout Builder',
   'coach.progress': 'Progress',
   'coach.messages': 'Messages',
-  'coach.welcome': 'Welcome back, Coach',
+  'coach.welcome':     'Welcome back, Coach',
+  'coach.welcomeBack': 'Welcome back,',
   'coach.myClients': 'My Clients',
   'coach.assignedClients': 'Assigned Clients',
 
@@ -940,6 +943,7 @@ const ar: Record<string, string> = {
   'pricing.titleHighlight': 'شفافة وبسيطة',
   'pricing.subtitle': 'لا رسوم خفية. لا تجارب مجانية. اختر الخطة التي تناسب أهدافك.',
   'pricing.perMonth': '/شهر',
+  'pricing.oneTime':  'مرة واحدة',
   'pricing.getStarted': 'ابدأ الآن',
   'pricing.popular': 'الأكثر شعبية',
   'pricing.consultation': 'احجز استشارة مجانية',
@@ -1051,11 +1055,13 @@ const ar: Record<string, string> = {
 
   // Coach Dashboard
   'coach.clients': 'العملاء',
+  'coach.client':  'عميل',
   'coach.mealBuilder': 'بناء الوجبات',
   'coach.workoutBuilder': 'بناء التمارين',
   'coach.progress': 'التقدم',
   'coach.messages': 'الرسائل',
-  'coach.welcome': 'مرحباً بك، أيها المدرب',
+  'coach.welcome':     'مرحباً بك، أيها المدرب',
+  'coach.welcomeBack': 'مرحباً بعودتك،',
   'coach.myClients': 'عملائي',
   'coach.assignedClients': 'العملاء المُعيَّنون',
 

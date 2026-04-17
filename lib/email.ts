@@ -2,37 +2,42 @@
  * lib/email.ts
  * ─────────────────────────────────────────────────────────────────
  * Transactional email for OMR+ / AthloCode.
- * Transport: Resend SMTP  (smtp.resend.com:465)
+ * Transport: Gmail SMTP via Nodemailer (works to any email, no domain needed)
  *
  * .env.local keys required:
- *   SMTP_HOST=smtp.resend.com
- *   SMTP_PORT=465
- *   SMTP_USER=resend
- *   SMTP_PASS=re_xxxxxxxxxxxx   ← your Resend API key
- *   EMAIL_FROM=AthloCode <noreply@omrplus.com>
+ *   SMTP_USER=your-gmail@gmail.com
+ *   SMTP_PASS=xxxx xxxx xxxx xxxx   ← 16-char Gmail App Password (NOT your Gmail password)
+ *   EMAIL_FROM=AthloCode <your-gmail@gmail.com>
  *   ADMIN_EMAIL=aoa12@hotmail.com
+ *
+ * How to get Gmail App Password:
+ *   1. Enable 2-Step Verification on your Google account
+ *   2. Go to: myaccount.google.com → Security → App Passwords
+ *   3. Select "Mail" → "Other" → name it "AthloCode"
+ *   4. Copy the 16-char password → paste into SMTP_PASS (spaces are ok)
+ *
+ * ── Production upgrade path ──────────────────────────────────────
+ *   Option A: Keep Gmail SMTP (free, simple, up to 500 emails/day)
+ *   Option B: Verify omrplus.com on Resend → switch SMTP to smtp.resend.com
+ *             and update EMAIL_FROM=AthloCode <noreply@omrplus.com>
  */
 import nodemailer from 'nodemailer';
 
-// ── SMTP transporter (created once, reused across calls) ─────────
 function createTransporter() {
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST ?? 'smtp.resend.com',
-    port: Number(process.env.SMTP_PORT ?? 465),
-    secure: true,          // port 465 uses implicit TLS
+    host:   process.env.SMTP_HOST   ?? 'smtp.gmail.com',
+    port:   Number(process.env.SMTP_PORT ?? 587),
+    secure: process.env.SMTP_PORT === '465', // true for port 465, false for 587 (STARTTLS)
     auth: {
-      user: process.env.SMTP_USER ?? 'resend',
+      user: process.env.SMTP_USER ?? '',
       pass: process.env.SMTP_PASS ?? '',
     },
   });
 }
 
-const FROM      = process.env.EMAIL_FROM   ?? 'AthloCode <onboarding@resend.dev>';
-const ADMIN     = process.env.ADMIN_EMAIL  ?? 'aoa12@hotmail.com';
-const APP_URL   = process.env.NEXT_PUBLIC_APP_URL ?? 'https://omrplus.com';
-// TEST MODE: when domain is not yet verified, Resend only allows sending to your
-// own registered email. Setting EMAIL_TEST_MODE=true redirects all mail to ADMIN.
-const TEST_MODE = process.env.EMAIL_TEST_MODE === 'true';
+const FROM    = process.env.EMAIL_FROM  ?? '';
+const ADMIN   = process.env.ADMIN_EMAIL ?? 'aoa12@hotmail.com';
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://omrplus.com').replace(/\/$/, '');
 
 // ── Shared brand styles ──────────────────────────────────────────
 const BASE_STYLE = `font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0B0B0B;color:#FFFFFF;margin:0;padding:0;`;
@@ -70,27 +75,23 @@ function layout(title: string, body: string): string {
 </html>`;
 }
 
-// ── Safe send (never throws — warns & skips if credentials missing) ─
-async function send(to: string, subject: string, html: string) {
+// ── Core send — never throws ────────────────────────────────────
+async function send(to: string, subject: string, html: string): Promise<void> {
+  const user = process.env.SMTP_USER ?? '';
   const pass = process.env.SMTP_PASS ?? '';
-  if (!pass || pass.startsWith('re_xxx')) {
-    console.warn(`[email] SMTP_PASS not configured — skipping email to ${to}: "${subject}"`);
+
+  if (!user || !pass) {
+    console.warn(`[email] SMTP not configured (SMTP_USER/SMTP_PASS missing) — skipping: "${subject}" → ${to}`);
     return;
   }
 
-  // In test mode all mail goes to the admin inbox so Resend's unverified-domain
-  // restriction (can only send to your own account email) does not block delivery.
-  const recipient = TEST_MODE ? ADMIN : to;
-  const finalSubject = TEST_MODE && to !== ADMIN
-    ? `[TEST → ${to}] ${subject}`
-    : subject;
-
   try {
     const transporter = createTransporter();
-    await transporter.sendMail({ from: FROM, to: recipient, subject: finalSubject, html });
-    console.log(`[email] sent → ${recipient}${TEST_MODE ? ` (test-mode, original: ${to})` : ''} | ${finalSubject}`);
-  } catch (err) {
-    console.error('[email] send failed:', err);
+    const info = await transporter.sendMail({ from: FROM || user, to, subject, html });
+    console.log(`[email] ✓ sent → ${to} | ${subject} | msgId:${info.messageId}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[email] ✗ failed → ${to} | ${subject} | ${msg}`);
   }
 }
 
@@ -111,7 +112,7 @@ export async function sendSubscriptionConfirmed(opts: {
       </div>
       <div style="${STAT_BOX}">
         <div style="${STAT_LABEL}">Amount</div>
-        <div style="${STAT_VALUE}">SAR ${opts.amount}</div>
+        <div style="${STAT_VALUE}">AED ${opts.amount}</div>
       </div>
       <div style="${STAT_BOX}">
         <div style="${STAT_LABEL}">Next Billing</div>
@@ -132,7 +133,7 @@ export async function sendPaymentFailed(opts: {
 }) {
   const html = layout('Action Required: Payment Failed', `
     <h2 style="${H2}">Payment Unsuccessful</h2>
-    <p style="${P}">Hi ${opts.name}, we were unable to process your payment for <strong style="color:#C9A84C">${opts.planName}</strong> (SAR ${opts.amount}).</p>
+    <p style="${P}">Hi ${opts.name}, we were unable to process your payment for <strong style="color:#C9A84C">${opts.planName}</strong> (AED ${opts.amount}).</p>
     <p style="${P}">Your dashboard access may be limited until the payment is resolved. Please update your payment method to continue your coaching.</p>
     <a href="${APP_URL}/checkout" style="${GOLD_BTN}">Update Payment Method →</a>
     <hr style="${DIVIDER}"/>
@@ -173,7 +174,7 @@ export async function sendSubscriptionRenewed(opts: {
     <div style="${STAT_ROW}">
       <div style="${STAT_BOX}">
         <div style="${STAT_LABEL}">Amount Charged</div>
-        <div style="${STAT_VALUE}">SAR ${opts.amount}</div>
+        <div style="${STAT_VALUE}">AED ${opts.amount}</div>
       </div>
       <div style="${STAT_BOX}">
         <div style="${STAT_LABEL}">Next Renewal</div>
@@ -197,7 +198,7 @@ export async function sendOrderConfirmed(opts: {
     <tr>
       <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.8);font-size:14px;">${i.name}</td>
       <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.45);font-size:14px;text-align:center;">×${i.quantity}</td>
-      <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);color:#C9A84C;font-size:14px;text-align:right;">SAR ${(i.price * i.quantity).toFixed(2)}</td>
+      <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);color:#C9A84C;font-size:14px;text-align:right;">AED ${(i.price * i.quantity).toFixed(2)}</td>
     </tr>`).join('');
 
   const html = layout('Order Confirmed — AthloCode', `
@@ -217,13 +218,13 @@ export async function sendOrderConfirmed(opts: {
       <tfoot>
         <tr>
           <td colspan="2" style="padding-top:14px;font-weight:700;color:rgba(255,255,255,0.6);font-size:14px;">Total</td>
-          <td style="padding-top:14px;font-weight:700;color:#C9A84C;font-size:16px;text-align:right;">SAR ${opts.total.toFixed(2)}</td>
+          <td style="padding-top:14px;font-weight:700;color:#C9A84C;font-size:16px;text-align:right;">AED ${opts.total.toFixed(2)}</td>
         </tr>
       </tfoot>
     </table>
     <a href="${APP_URL}/dashboard/client" style="${GOLD_BTN}">View My Orders →</a>
   `);
-  await send(opts.to, `✅ Order Confirmed — SAR ${opts.total.toFixed(2)}`, html);
+  await send(opts.to, `✅ Order Confirmed — AED ${opts.total.toFixed(2)}`, html);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -313,20 +314,21 @@ export async function sendEmailConfirmation(opts: {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// 10. PASSWORD RESET (Supabase Auth Hook)
+// 10. PASSWORD RESET
 // ══════════════════════════════════════════════════════════════════
 export async function sendPasswordResetEmail(opts: {
   to: string; resetUrl: string; name?: string;
 }) {
   const greeting = opts.name ? `Hi ${opts.name},` : 'Hello,';
   const html = layout('Reset Your AthloCode Password', `
-    <h2 style="${H2}">Password Reset Request</h2>
+    <h2 style="${H2}">Password Reset Request 🔑</h2>
     <p style="${P}">${greeting} we received a request to reset the password for your AthloCode account.</p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${opts.resetUrl}" style="${GOLD_BTN}">Reset My Password →</a>
     </div>
     <hr style="${DIVIDER}"/>
-    <p style="${MUTED}">This link is valid for 1 hour. If you did not request a password reset, please ignore this email — your account is safe.</p>
+    <p style="${MUTED}">This link is valid for <strong style="color:rgba(255,255,255,0.6);">1 hour</strong> and can only be used once.</p>
+    <p style="${MUTED}">If you did not request a password reset, please ignore this email — your account is safe.</p>
     <p style="${MUTED}">Having trouble with the button? Copy and paste this link into your browser:</p>
     <p style="word-break:break-all;font-size:12px;color:rgba(201,168,76,0.6);margin-top:8px;">${opts.resetUrl}</p>
     <hr style="${DIVIDER}"/>

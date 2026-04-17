@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { CartProvider } from "@/context/CartContext";
+import ForceReloadOnBack from "@/components/home/ForceReloadOnBack";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,7 +44,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-brand-black text-white">
         <LanguageProvider>
           <AuthProvider>
-            <CartProvider>{children}</CartProvider>
+            <CartProvider>
+              <ForceReloadOnBack />
+              {children}
+            </CartProvider>
           </AuthProvider>
         </LanguageProvider>
       </body>

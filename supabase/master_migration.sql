@@ -162,16 +162,24 @@ DROP POLICY IF EXISTS "profiles_admin_select_all"    ON profiles;
 DROP POLICY IF EXISTS "profiles_admin_update_all"    ON profiles;
 DROP POLICY IF EXISTS "admin_select_all_profiles"    ON profiles;
 DROP POLICY IF EXISTS "admin_update_all_profiles"    ON profiles;
-DROP POLICY IF EXISTS "coach_read_assigned_profiles" ON profiles;
+DROP POLICY IF EXISTS "coach_read_assigned_profiles"  ON profiles;
+DROP POLICY IF EXISTS "client_read_assigned_coach"    ON profiles;
 
 CREATE POLICY "profiles_select_own" ON profiles FOR SELECT
   USING (auth.uid() = id OR is_admin());
 CREATE POLICY "profiles_update_own" ON profiles FOR UPDATE
   USING (auth.uid() = id OR is_admin());
+-- Coaches can read profiles of their assigned clients
 CREATE POLICY "coach_read_assigned_profiles" ON profiles FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM trainer_client_assignments
     WHERE trainer_id = auth.uid() AND client_id = profiles.id
+  ));
+-- Clients can read the profile of their assigned coach
+CREATE POLICY "client_read_assigned_coach" ON profiles FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM trainer_client_assignments
+    WHERE client_id = auth.uid() AND trainer_id = profiles.id
   ));
 
 -- ── 8. SUBSCRIPTIONS RLS ─────────────────────────────────────

@@ -85,6 +85,7 @@ interface PricingPlan {
   cta_text: string | null;
   cta_text_ar: string | null;
   price_sar: number;
+  billing_type: 'monthly' | 'one_time';
   stripe_price_id: string | null;
   features: string[] | null;
   features_ar: string[] | null;
@@ -759,7 +760,7 @@ function EditClientModal({ client, onClose, onRefresh }: {
                               </div>
                             </div>
                             <p style={{ fontSize: '1.05rem', fontWeight: 800, color: isSelected ? '#C9A84C' : 'rgba(255,255,255,0.7)', letterSpacing: '-0.01em' }} dir="ltr">
-                              AED {plan.price_sar}<span style={{ fontSize: '0.62rem', fontWeight: 400, color: 'rgba(255,255,255,0.25)', marginLeft: 3 }}>/mo</span>
+                              AED {plan.price_sar}<span style={{ fontSize: '0.62rem', fontWeight: 400, color: 'rgba(255,255,255,0.25)', marginLeft: 3 }}>{plan.billing_type === 'one_time' ? 'one-time' : '/mo'}</span>
                             </p>
                           </div>
                         );
@@ -1541,9 +1542,17 @@ function MarketplaceTab() {
   const [form, setForm] = useState({ name: '', name_ar: '', description: '', description_ar: '', price_sar: '', type: 'supplement', image_url: '', file_url: '', is_active: true });
   const [saving, setSaving] = useState(false);
   const [imgUploading, setImgUploading] = useState(false);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState(0);
   const imgInputRef = React.useRef<HTMLInputElement>(null);
+  const pdfInputRef = React.useRef<HTMLInputElement>(null);
   const [translating, setTranslating] = useState<'name'|'desc'|null>(null);
   const translateTimers = React.useRef<{ name?: ReturnType<typeof setTimeout>; desc?: ReturnType<typeof setTimeout> }>({});
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagResult, setDiagResult] = useState<Record<string, unknown> | null>(null);
+
+  // Edge Function URL — deployed at Supabase CDN edge, zero proxy hop
+  const EDGE_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-product`;
 
   const autoTranslate = (field: 'name'|'desc', text: string) => {
     clearTimeout(translateTimers.current[field]);
@@ -1577,8 +1586,14 @@ function MarketplaceTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-      setProducts(data ?? []);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+      const res = await fetch('/api/admin/products-list', { headers });
+      if (res.ok) {
+        const json = await res.json() as { products?: Product[] };
+        setProducts(json.products ?? []);
+      }
     } catch {
       setProducts([]);
     } finally {
@@ -1594,38 +1609,122 @@ function MarketplaceTab() {
     setShowForm(true);
   };
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) h['Authorization'] = `Bearer ${session.access_token}`;
+    return h;
+  };
+
+  const [saveError, setSaveError] = useState('');
+
   const saveProduct = async () => {
     if (!form.name.trim() || !form.price_sar) return;
     setSaving(true);
-    const payload = {
-      name: form.name.trim(),
-      name_ar: form.name_ar.trim() || null,
-      description: form.description.trim() || null,
-      description_ar: form.description_ar.trim() || null,
-      price_sar: Number(form.price_sar),
-      type: form.type,
-      image_url: form.image_url.trim() || null,
-      file_url: form.file_url.trim() || null,
-      is_active: form.is_active,
-    };
-    if (editProduct) {
-      await supabase.from('products').update(payload).eq('id', editProduct.id);
-    } else {
-      await supabase.from('products').insert(payload);
+    setSaveError('');
+
+    // Abort if the request takes longer than 20 seconds
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+
+    try {
+      const payload = {
+        ...(editProduct ? { id: editProduct.id } : {}),
+        name: form.name.trim(),
+        name_ar: form.name_ar.trim() || null,
+        description: form.description.trim() || null,
+        description_ar: form.description_ar.trim() || null,
+        price_sar: Number(form.price_sar),
+        type: form.type,
+        image_url: form.image_url.trim() || null,
+        file_url: form.file_url.trim() || null,
+        is_active: form.is_active,
+      };
+
+      const res = await fetch(EDGE_URL, {
+        method: editProduct ? 'PUT' : 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      let json: { product?: Product; error?: string; code?: string } = {};
+      try { json = await res.json(); } catch { /* empty body */ }
+
+      if (!res.ok || json.error) {
+        setSaveError(json.error ?? `Server error (${res.status})`);
+        return;
+      }
+
+      // Patch local state immediately — no re-fetch needed
+      if (json.product) {
+        if (editProduct) {
+          setProducts(prev => prev.map(p => p.id === editProduct.id ? json.product! : p));
+        } else {
+          setProducts(prev => [json.product!, ...prev]);
+        }
+      }
+      setShowForm(false);
+      setEditProduct(null);
+      setForm({ name: '', name_ar: '', description: '', description_ar: '', price_sar: '', type: 'supplement', image_url: '', file_url: '', is_active: true });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        setSaveError('Request timed out. Your Supabase project may be waking up — please try again in a moment.');
+      } else {
+        setSaveError(err instanceof Error ? err.message : 'Unexpected error');
+      }
+    } finally {
+      clearTimeout(timeout);
+      setSaving(false);
     }
-    await load();
-    setShowForm(false); setEditProduct(null); setForm({ name: '', name_ar: '', description: '', description_ar: '', price_sar: '', type: 'supplement', image_url: '', file_url: '', is_active: true });
-    setSaving(false);
   };
 
   const deleteProduct = async (id: string) => {
-    await supabase.from('products').delete().eq('id', id);
-    setProducts(prev => prev.filter(p => p.id !== id));
+    try {
+      await fetch(EDGE_URL, {
+        method: 'DELETE',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ id }),
+      });
+      setProducts(prev => prev.filter(p => p.id !== id));
+    } catch { /* silent */ }
   };
 
   const toggleActive = async (id: string, current: boolean) => {
-    await supabase.from('products').update({ is_active: !current }).eq('id', id);
+    // Optimistic UI update
     setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: !current } : p));
+    const product = products.find(p => p.id === id);
+    try {
+      await fetch(EDGE_URL, {
+        method: 'PUT',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({
+          id,
+          is_active: !current,
+          name: product?.name ?? '',
+          price_sar: product?.price_sar ?? 0,
+          type: product?.type ?? 'supplement',
+        }),
+      });
+    } catch {
+      // Revert on failure
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: current } : p));
+    }
+  };
+
+  const runDiagnostics = async () => {
+    setDiagnosing(true);
+    setDiagResult(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/admin/debug-products', { headers });
+      const json = await res.json();
+      setDiagResult(json);
+    } catch (err) {
+      setDiagResult({ fetchError: err instanceof Error ? err.message : 'Network error' });
+    } finally {
+      setDiagnosing(false);
+    }
   };
 
   const handleImageUpload = async (file: File) => {
@@ -1643,6 +1742,58 @@ function MarketplaceTab() {
     }
   };
 
+  const handlePdfUpload = async (file: File) => {
+    if (!file || file.type !== 'application/pdf') return;
+    setPdfUploading(true);
+    setPdfProgress(0);
+    try {
+      // Step 1 — get a signed upload URL from server (lightweight, no file data sent)
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+
+      const signRes = await fetch(
+        `/api/admin/upload-ebook?filename=${encodeURIComponent(file.name)}`,
+        { headers }
+      );
+      const signJson = await signRes.json() as { uploadUrl?: string; token?: string; publicUrl?: string; error?: string };
+      if (!signRes.ok || signJson.error || !signJson.uploadUrl) {
+        console.error('[pdf upload] sign error:', signJson.error);
+        return;
+      }
+
+      // Step 2 — upload directly from browser to Supabase Storage via XHR
+      // (XHR lets us track real upload progress; fetch doesn't)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', signJson.uploadUrl!);
+        xhr.setRequestHeader('Content-Type', 'application/pdf');
+        xhr.setRequestHeader('x-upsert', 'true');
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setPdfProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(file);
+      });
+
+      setPdfProgress(100);
+      setForm(p => ({ ...p, file_url: signJson.publicUrl ?? '' }));
+    } catch (err) {
+      console.error('[pdf upload]', err);
+    } finally {
+      setPdfUploading(false);
+      setPdfProgress(0);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -1650,16 +1801,86 @@ function MarketplaceTab() {
           <p className="ds-section-title">{t('admin.marketplaceTitle')}</p>
           <p className="ds-section-sub">{t('admin.marketplaceSub')}</p>
         </div>
-        <button className="ds-btn-gold" onClick={() => { setShowForm(!showForm); setEditProduct(null); setForm({ name: '', name_ar: '', description: '', description_ar: '', price_sar: '', type: 'supplement', image_url: '', file_url: '', is_active: true }); }}>
-          <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          {t('admin.addProduct')}
-        </button>
+        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+          <button
+            onClick={runDiagnostics}
+            disabled={diagnosing}
+            style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.45rem 0.85rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', cursor: diagnosing ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', transition: 'all 0.2s' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.75)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}
+          >
+            <svg style={{ width: 12, height: 12 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l5.654-4.654m5.714-4.42a3.735 3.735 0 0 0-1.208.766L9.158 9.4l2.346-2.347" /></svg>
+            {diagnosing ? 'Checking…' : 'Diagnose DB'}
+          </button>
+          <button className="ds-btn-gold" onClick={() => { setShowForm(!showForm); setEditProduct(null); setForm({ name: '', name_ar: '', description: '', description_ar: '', price_sar: '', type: 'supplement', image_url: '', file_url: '', is_active: true }); }}>
+            <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            {t('admin.addProduct')}
+          </button>
+        </div>
       </div>
+
+      {/* ── Diagnostics result panel ── */}
+      {diagResult && (
+        <div style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem', borderRadius: 12, background: 'rgba(10,10,10,0.8)', border: `1px solid ${diagResult.insertSuccess ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <p style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: diagResult.insertSuccess ? 'rgba(34,197,94,0.8)' : 'rgba(239,68,68,0.8)' }}>
+              {diagResult.insertSuccess ? '✓ Database OK — products table is working' : '✗ Database Issue Detected'}
+            </p>
+            <button onClick={() => setDiagResult(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '1rem' }}>×</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.5rem' }}>
+            {[
+              { label: 'Has JWT Token', value: diagResult.hasToken },
+              { label: 'JWT Decoded', value: diagResult.jwtDecoded },
+              { label: 'User ID', value: diagResult.userId as string, mono: true },
+              { label: 'Profile Role', value: diagResult.profileRole as string },
+              { label: 'Is Admin', value: diagResult.isAdmin },
+              { label: 'Products Table', value: diagResult.productsTableExists },
+              { label: 'Existing Products', value: diagResult.productsCount as number },
+              { label: 'Insert Test', value: diagResult.insertSuccess },
+            ].map(row => (
+              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>{row.label}</span>
+                <span style={{ color: row.value === true ? '#22c55e' : row.value === false ? '#ef4444' : '#C9A84C', fontFamily: row.mono ? 'monospace' : undefined, fontSize: row.mono ? '0.68rem' : undefined }}>
+                  {row.value === true ? '✓ Yes' : row.value === false ? '✗ No' : row.value == null ? '—' : String(row.value)}
+                </span>
+              </div>
+            ))}
+          </div>
+          {Boolean(diagResult.productsTableError || diagResult.insertError || diagResult.profileError) && (
+            <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.85rem', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <p style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(239,68,68,0.7)', marginBottom: '0.3rem' }}>Error Details:</p>
+              {diagResult.profileError ? <p style={{ fontSize: '0.7rem', color: 'rgba(239,68,68,0.6)', fontFamily: 'monospace' }}>Profile: {String(diagResult.profileError)}</p> : null}
+              {diagResult.productsTableError ? <p style={{ fontSize: '0.7rem', color: 'rgba(239,68,68,0.6)', fontFamily: 'monospace' }}>Table ({String(diagResult.productsTableCode ?? '')}): {String(diagResult.productsTableError)}</p> : null}
+              {diagResult.insertError ? <p style={{ fontSize: '0.7rem', color: 'rgba(239,68,68,0.6)', fontFamily: 'monospace' }}>Insert ({String(diagResult.insertCode ?? '')}): {String(diagResult.insertError)}</p> : null}
+              {String(diagResult.productsTableError ?? '').includes('does not exist') ? (
+                <p style={{ fontSize: '0.72rem', color: '#C9A84C', marginTop: '0.5rem', fontWeight: 600 }}>
+                  → Fix: Run <code style={{ background: 'rgba(201,168,76,0.1)', padding: '0.1rem 0.3rem', borderRadius: 4 }}>supabase/products_setup.sql</code> in your Supabase SQL Editor
+                </p>
+              ) : null}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Product Form Modal ── */}
       {showForm && (
-        <AdminModal open={showForm} onClose={() => { setShowForm(false); setEditProduct(null); }} title={editProduct ? 'Edit Product' : 'Add New Product'} maxWidth={680}>
+        <AdminModal open={showForm} onClose={() => { setShowForm(false); setEditProduct(null); setSaveError(''); }} title={editProduct ? 'Edit Product' : 'Add New Product'} maxWidth={680}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+            {/* ── Error banner — shown at TOP so it's never hidden below scroll ── */}
+            {saveError && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '0.85rem 1rem', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <svg style={{ width: 16, height: 16, color: 'rgba(239,68,68,0.85)', flexShrink: 0, marginTop: 1 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(239,68,68,0.9)', marginBottom: 2 }}>Failed to save product</p>
+                  <p style={{ fontSize: '0.75rem', color: 'rgba(239,68,68,0.7)', lineHeight: 1.5 }}>{saveError}</p>
+                </div>
+                <button onClick={() => setSaveError('')} style={{ background: 'none', border: 'none', color: 'rgba(239,68,68,0.5)', cursor: 'pointer', padding: 2 }}>
+                  <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            )}
 
             {/* ── Section 1: Product Name ── */}
             <div>
@@ -1784,16 +2005,90 @@ function MarketplaceTab() {
               </div>
             </div>
 
-            {/* ── Section 5: Ebook Download URL (conditional) ── */}
+            {/* ── Section 5: Ebook PDF Upload (conditional) ── */}
             {form.type === 'ebook' && (
               <div>
-                <p style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(201,168,76,0.6)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Ebook File</p>
-                <label className="ds-label">Download URL</label>
-                <div style={{ position: 'relative' }}>
-                  <svg style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
-                  <input className="ds-input" placeholder="https://… (PDF, EPUB, or download link)" value={form.file_url}
-                    onChange={e => setForm(p => ({ ...p, file_url: e.target.value }))}
-                    style={{ paddingLeft: '2.4rem' }} />
+                <p style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(201,168,76,0.6)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Ebook PDF File</p>
+
+                {/* Hidden file input */}
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); e.target.value = ''; }}
+                />
+
+                {/* Upload drop zone */}
+                {!form.file_url ? (
+                  <div
+                    onClick={() => !pdfUploading && pdfInputRef.current?.click()}
+                    style={{
+                      border: '2px dashed rgba(201,168,76,0.25)', borderRadius: 12, padding: '1.5rem 1rem',
+                      textAlign: 'center', cursor: pdfUploading ? 'not-allowed' : 'pointer',
+                      background: 'rgba(201,168,76,0.03)', transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => { if (!pdfUploading) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(201,168,76,0.5)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(201,168,76,0.25)'; }}
+                  >
+                    {pdfUploading ? (
+                      <div style={{ padding: '0.5rem 0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 }}>
+                          <div className="ds-loading" style={{ width: 14, height: 14, borderRadius: '50%' }} />
+                          <span style={{ fontSize: '0.8rem', color: '#C9A84C', fontWeight: 600 }}>
+                            {pdfProgress > 0 ? `Uploading… ${pdfProgress}%` : 'Preparing upload…'}
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div style={{ height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#C9A84C,#E8CC6E)', width: `${pdfProgress}%`, transition: 'width 0.25s ease' }} />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <svg style={{ width: 28, height: 28, color: 'rgba(201,168,76,0.45)', margin: '0 auto 0.6rem' }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                        <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginBottom: 3 }}>Click to upload PDF</p>
+                        <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)' }}>PDF files only — max 50 MB</p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  /* PDF already uploaded — show filename + replace option */
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0.85rem 1rem', borderRadius: 10, background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.2)' }}>
+                    <svg style={{ width: 22, height: 22, color: '#C9A84C', flexShrink: 0 }} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {form.file_url.split('/').pop()?.replace(/^\d+_/, '') ?? 'ebook.pdf'}
+                      </p>
+                      <a href={form.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.68rem', color: 'rgba(201,168,76,0.6)', textDecoration: 'none' }}>Preview PDF ↗</a>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => !pdfUploading && pdfInputRef.current?.click()}
+                        disabled={pdfUploading}
+                        style={{ padding: '0.35rem 0.7rem', borderRadius: 7, fontSize: '0.7rem', fontWeight: 600, border: '1px solid rgba(201,168,76,0.3)', background: 'transparent', color: '#C9A84C', cursor: 'pointer' }}
+                      >
+                        {pdfUploading ? 'Uploading…' : 'Replace'}
+                      </button>
+                      <button
+                        onClick={() => setForm(p => ({ ...p, file_url: '' }))}
+                        style={{ padding: '0.35rem 0.7rem', borderRadius: 7, fontSize: '0.7rem', fontWeight: 600, border: '1px solid rgba(248,113,113,0.25)', background: 'transparent', color: 'rgba(248,113,113,0.7)', cursor: 'pointer' }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Fallback: paste URL manually */}
+                <div style={{ marginTop: '0.75rem' }}>
+                  <label className="ds-label" style={{ marginBottom: '0.35rem', display: 'block' }}>Or paste a URL instead</label>
+                  <div style={{ position: 'relative' }}>
+                    <svg style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'rgba(255,255,255,0.25)', pointerEvents: 'none' }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+                    <input className="ds-input" placeholder="https://…" value={form.file_url}
+                      onChange={e => setForm(p => ({ ...p, file_url: e.target.value }))}
+                      style={{ paddingLeft: '2.3rem', fontSize: '0.78rem' }} />
+                  </div>
                 </div>
               </div>
             )}
@@ -1812,6 +2107,13 @@ function MarketplaceTab() {
                 <span className="ds-toggle-knob" style={{ left: form.is_active ? '23px' : '3px' }} />
               </button>
             </div>
+
+            {/* ── Save Error ── */}
+            {saveError && (
+              <div style={{ padding: '0.7rem 1rem', borderRadius: 9, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', fontSize: '0.8rem', color: 'rgba(239,68,68,0.9)' }}>
+                {saveError}
+              </div>
+            )}
 
             {/* ── Footer Buttons ── */}
             <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '0.25rem' }}>
@@ -1896,37 +2198,230 @@ function MarketplaceTab() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: '1rem' }}>
-          {products.map(p => (
-            <div key={p.id} className="ds-card" style={{ padding: '1.25rem' }}>
-              {p.image_url && (
-                <img src={p.image_url} alt={p.name} style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 10, marginBottom: '0.9rem' }} />
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
-                <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{p.name}</p>
-                <span className="ds-badge-gold" style={{ whiteSpace: 'nowrap' }}>${p.price_sar}</span>
-              </div>
-              {p.description && <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', marginBottom: '0.75rem', lineHeight: 1.4 }}>{p.description}</p>}
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span className="ds-badge-gray" style={{ textTransform: 'capitalize' }}>{p.type}</span>
-                  <button
-                    className="ds-toggle"
-                    style={{ width: 36, height: 20, background: p.is_active ? '#C9A84C' : 'rgba(255,255,255,0.1)' }}
-                    onClick={() => toggleActive(p.id, p.is_active)}
-                  >
-                    <span className="ds-toggle-knob" style={{ width: 14, height: 14, left: p.is_active ? '19px' : '3px' }} />
-                  </button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '1.25rem' }}>
+          {products.map(p => {
+            const pType = p.type ?? 'other';
+            const typeIcon: Record<string, React.ReactNode> = {
+              ebook: (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 32, height: 32 }}>
+                  <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              ),
+              supplement: (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 32, height: 32 }}>
+                  <path d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21a48.309 48.309 0 0 1-8.135-.687c-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                </svg>
+              ),
+              snack: (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 32, height: 32 }}>
+                  <path d="M12 8.25v-1.5m0 1.5c-1.355 0-2.697.056-4.024.166C6.845 8.51 6 9.473 6 10.608v2.513m6-4.871c1.355 0 2.697.056 4.024.166C17.155 8.51 18 9.473 18 10.608v2.513M15 9.75l-3 3m0 0-3-3m3 3V21m6-12h.008v.008H21V9Zm-3 0h.008v.008H18V9Zm-9 0h.008v.008H9V9Zm-3 0h.008v.008H6V9Z" />
+                </svg>
+              ),
+              equipment: (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 32, height: 32 }}>
+                  <path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 2.91c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125m16.5 3.158c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                </svg>
+              ),
+              other: (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 32, height: 32 }}>
+                  <path d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+                </svg>
+              ),
+            };
+            const typeColor: Record<string, string> = {
+              ebook: 'rgba(139,92,246,0.9)', supplement: 'rgba(34,197,94,0.9)',
+              snack: 'rgba(251,146,60,0.9)', equipment: 'rgba(96,165,250,0.9)', other: 'rgba(255,255,255,0.4)',
+            };
+            const typeBg: Record<string, string> = {
+              ebook: 'rgba(139,92,246,0.1)', supplement: 'rgba(34,197,94,0.1)',
+              snack: 'rgba(251,146,60,0.1)', equipment: 'rgba(96,165,250,0.1)', other: 'rgba(255,255,255,0.05)',
+            };
+            return (
+              <div
+                key={p.id}
+                style={{
+                  position: 'relative',
+                  borderRadius: 16,
+                  background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)',
+                  border: `1px solid ${p.is_active ? 'rgba(201,168,76,0.2)' : 'rgba(255,255,255,0.07)'}`,
+                  overflow: 'hidden',
+                  transition: 'border-color 0.25s, box-shadow 0.25s',
+                  boxShadow: p.is_active ? '0 0 0 0 transparent, inset 0 1px 0 rgba(201,168,76,0.08)' : 'none',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = p.is_active ? 'rgba(201,168,76,0.45)' : 'rgba(255,255,255,0.15)';
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = p.is_active ? 'rgba(201,168,76,0.2)' : 'rgba(255,255,255,0.07)';
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+                }}
+              >
+                {/* Active glow strip at top */}
+                {p.is_active && (
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.6), transparent)' }} />
+                )}
+
+                {/* Product image */}
+                {p.image_url ? (
+                  <div style={{ position: 'relative', width: '100%', height: 160, overflow: 'hidden' }}>
+                    <img
+                      src={p.image_url} alt={p.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, rgba(10,10,10,0.85) 100%)' }} />
+                    {/* Price badge over image */}
+                    <div style={{
+                      position: 'absolute', top: 10, right: 10,
+                      background: 'rgba(10,10,10,0.75)', backdropFilter: 'blur(8px)',
+                      border: '1px solid rgba(201,168,76,0.4)', borderRadius: 8,
+                      padding: '0.25rem 0.65rem', fontSize: '0.8rem', fontWeight: 700, color: '#C9A84C',
+                    }}>
+                      AED {p.price_sar}
+                    </div>
+                  </div>
+                ) : (
+                  /* No-image placeholder with type icon */
+                  <div style={{
+                    width: '100%', height: 100,
+                    background: 'linear-gradient(135deg, rgba(201,168,76,0.08), rgba(0,0,0,0.25))',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderBottom: '1px solid rgba(201,168,76,0.1)',
+                    color: '#C9A84C',
+                  }}>
+                    {typeIcon[pType]}
+                  </div>
+                )}
+
+                {/* Card body */}
+                <div style={{ padding: '1rem 1.15rem 1.1rem' }}>
+
+                  {/* Name row */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '0.92rem', fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.3, marginBottom: p.name_ar ? '0.18rem' : 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.name}
+                      </p>
+                      {p.name_ar && (
+                        <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', direction: 'rtl', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {p.name_ar}
+                        </p>
+                      )}
+                    </div>
+                    {/* Price badge (no image case) */}
+                    {!p.image_url && (
+                      <span style={{
+                        flexShrink: 0, fontSize: '0.78rem', fontWeight: 700, color: '#C9A84C',
+                        background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)',
+                        borderRadius: 7, padding: '0.2rem 0.55rem', whiteSpace: 'nowrap',
+                      }}>
+                        AED {p.price_sar}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  {p.description && (
+                    <p style={{
+                      fontSize: '0.74rem', color: 'rgba(255,255,255,0.38)', lineHeight: 1.55,
+                      marginBottom: '0.9rem',
+                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    }}>
+                      {p.description}
+                    </p>
+                  )}
+
+                  {/* PDF link */}
+                  {p.file_url && (
+                    <a
+                      href={p.file_url} target="_blank" rel="noreferrer"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.68rem', color: 'rgba(201,168,76,0.7)', marginBottom: '0.85rem', textDecoration: 'none' }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#C9A84C')}
+                      onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.7)')}
+                    >
+                      <svg style={{ width: 12, height: 12, flexShrink: 0 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                      View PDF
+                    </a>
+                  )}
+
+                  {/* Divider */}
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '0 0 0.85rem' }} />
+
+                  {/* Footer row */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+
+                    {/* Type pill + toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                        fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'capitalize',
+                        padding: '0.22rem 0.6rem', borderRadius: 20,
+                        background: 'rgba(201,168,76,0.08)',
+                        color: 'rgba(201,168,76,0.85)',
+                        border: '1px solid rgba(201,168,76,0.2)',
+                      }}>
+                        {pType}
+                      </span>
+
+                      {/* Active toggle */}
+                      <button
+                        onClick={() => toggleActive(p.id, p.is_active)}
+                        title={p.is_active ? 'Active — click to deactivate' : 'Inactive — click to activate'}
+                        style={{
+                          position: 'relative', display: 'inline-flex', alignItems: 'center',
+                          width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 0,
+                          background: p.is_active ? '#C9A84C' : 'rgba(255,255,255,0.1)',
+                          transition: 'background 0.2s',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span style={{
+                          position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%',
+                          background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                          left: p.is_active ? '19px' : '3px',
+                        }} />
+                      </button>
+
+                      <span style={{ fontSize: '0.62rem', color: p.is_active ? 'rgba(201,168,76,0.7)' : 'rgba(255,255,255,0.2)', fontWeight: 600 }}>
+                        {p.is_active ? 'Live' : 'Draft'}
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <button
+                        onClick={() => openEdit(p)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                          padding: '0.32rem 0.75rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.65)',
+                          fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.65)'; }}
+                      >
+                        <svg style={{ width: 11, height: 11 }} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteProduct(p.id)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)',
+                          background: 'rgba(248,113,113,0.06)', color: 'rgba(248,113,113,0.5)',
+                          cursor: 'pointer', transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.15)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(248,113,113,0.9)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(248,113,113,0.3)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.06)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(248,113,113,0.5)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(248,113,113,0.15)'; }}
+                      >
+                        <svg style={{ width: 13, height: 13 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <button className="ds-btn-outline" style={{ padding: '0.35rem 0.7rem', fontSize: '0.72rem' }} onClick={() => openEdit(p)}>Edit</button>
-                  <button style={{ background: 'none', border: 'none', color: 'rgba(248,113,113,0.5)', cursor: 'pointer', padding: 4 }} onClick={() => deleteProduct(p.id)}>
-                    <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
-                  </button>
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -2123,7 +2618,7 @@ function OrdersTab() {
 const BLANK_PLAN: Partial<PricingPlan> = {
   name: '', name_ar: '', description: '', description_ar: '', tagline: '', tagline_ar: '',
   cta_text: 'Get Started', cta_text_ar: '', features: [], features_ar: [],
-  price_sar: 0, stripe_price_id: '', is_published: false, is_featured: false,
+  price_sar: 0, billing_type: 'monthly', stripe_price_id: '', is_published: false, is_featured: false,
 };
 
 function PricingTab() {
@@ -2170,6 +2665,7 @@ function PricingTab() {
       cta_text: plan.cta_text ?? 'Get Started',
       cta_text_ar: plan.cta_text_ar ?? '',
       price_sar: plan.price_sar,
+      billing_type: plan.billing_type ?? 'monthly',
       stripe_price_id: plan.stripe_price_id ?? '',
       features: plan.features ?? [],
       features_ar: plan.features_ar ?? [],
@@ -2355,11 +2851,18 @@ function PricingTab() {
           </div>
         </div>
 
-        {/* Row 3: Price */}
-        <div className="admin-2col-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
+        {/* Row 3: Price + Billing Type */}
+        <div className="admin-2col-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '0.75rem' }}>
           <div>
-            <label className="ds-label">Price (AED/mo) *</label>
+            <label className="ds-label">Price (AED) *</label>
             <input className="ds-input" type="number" min="0" placeholder="349" value={editForm.price_sar ?? ''} onChange={e => setEditForm(p => ({ ...p, price_sar: Number(e.target.value) }))} />
+          </div>
+          <div>
+            <label className="ds-label">Billing Type</label>
+            <select className="ds-input" style={{ cursor: 'pointer', colorScheme: 'dark' }} value={editForm.billing_type ?? 'monthly'} onChange={e => setEditForm(p => ({ ...p, billing_type: e.target.value as 'monthly' | 'one_time' }))}>
+              <option value="monthly">Monthly (recurring)</option>
+              <option value="one_time">One-Time purchase</option>
+            </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
             <div style={{ padding: '0.55rem 0.85rem', background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: 10, width: '100%' }}>
@@ -2512,7 +3015,9 @@ function PricingTab() {
               {/* Price */}
               <div style={{ marginBottom: '0.85rem' }}>
                 <span style={{ fontSize: '1.6rem', fontWeight: 700, color: '#C9A84C' }}>{plan.price_sar}</span>
-                <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', marginLeft: 4 }}>AED/mo</span>
+                <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', marginLeft: 4 }}>
+                  {plan.billing_type === 'one_time' ? 'AED one-time' : 'AED/mo'}
+                </span>
               </div>
 
               {/* Stripe Price ID */}
@@ -3472,6 +3977,7 @@ const CMS_DEFAULTS: Record<string, { en: string; ar: string }> = {
   'pricing.subtitle':             { en: 'Transparent pricing. No hidden fees. Cancel anytime.', ar: 'أسعار شفافة. لا رسوم خفية. إلغاء في أي وقت.' },
   'pricing.popular':              { en: 'Most Popular', ar: 'الأكثر شعبية' },
   'pricing.perMonth':             { en: '/mo', ar: '/شهر' },
+  'pricing.oneTime':              { en: 'one-time', ar: 'مرة واحدة' },
   'pricing.plan1.cta':            { en: 'Get Started', ar: 'ابدأ الآن' },
   'pricing.footer1':              { en: 'All prices in AED. Includes 1-month free consultation session.', ar: 'جميع الأسعار بالدرهم الإماراتي. تشمل جلسة استشارة مجانية لمدة شهر.' },
   'pricing.footer2':              { en: 'No long-term contracts required.', ar: 'لا عقود طويلة الأمد مطلوبة.' },

@@ -12,6 +12,7 @@ CREATE TABLE pricing_plans (
   cta_text        text DEFAULT 'Get Started',
   price_sar       integer NOT NULL DEFAULT 0,
   stripe_price_id text,
+  billing_type    text NOT NULL DEFAULT 'monthly' CHECK (billing_type IN ('monthly', 'one_time')),
   features        text[] DEFAULT '{}',
   is_published    boolean NOT NULL DEFAULT false,
   is_featured     boolean NOT NULL DEFAULT false,

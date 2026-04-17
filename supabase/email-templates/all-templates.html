@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AthloCode — Supabase Email Templates</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #111; color: #e0e0e0; padding: 40px 20px; }
+    h1 { font-size: 1.6rem; color: #C9A84C; margin-bottom: 6px; }
+    .subtitle { font-size: 0.85rem; color: rgba(255,255,255,0.4); margin-bottom: 40px; }
+    .template-section { margin-bottom: 60px; }
+    .template-section h2 { font-size: 1rem; font-weight: 700; color: #C9A84C; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 4px; }
+    .template-section p { font-size: 0.8rem; color: rgba(255,255,255,0.35); margin-bottom: 14px; }
+    pre { background: #0B0B0B; border: 1px solid rgba(201,168,76,0.18); border-radius: 8px; padding: 20px; font-size: 0.78rem; overflow-x: auto; color: #c8e6c9; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+    .preview-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.3); margin-top: 18px; margin-bottom: 8px; }
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(201,168,76,0.2), transparent); margin: 50px 0; }
+    .badge { display: inline-block; background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.3); color: #C9A84C; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; border-radius: 4px; padding: 2px 8px; margin-left: 10px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+
+<h1>⚡ AthloCode — Supabase Auth Email Templates</h1>
+<p class="subtitle">Copy each template into Supabase → Authentication → Email Templates. 6 templates total.</p>
+
+<!-- ═══════════════════════════════════════════════════════
+     1. CONFIRM SIGN UP
+════════════════════════════════════════════════════════ -->
+<div class="template-section">
+  <h2>1. Confirm Sign Up <span class="badge">Subject: Confirm your AthloCode account</span></h2>
+  <p>Supabase path: Authentication → Email Templates → Confirm signup</p>
+  <pre>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8" /&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;
+  &lt;title&gt;Confirm Your AthloCode Account&lt;/title&gt;
+&lt;/head&gt;
+&lt;body style="margin:0;padding:0;background:#0B0B0B;font-family:Arial,Helvetica,sans-serif;"&gt;
+
+  &lt;!-- Wrapper --&gt;
+  &lt;table width="100%" cellpadding="0" cellspacing="0" style="background:#0B0B0B;padding:40px 16px;"&gt;
+    &lt;tr&gt;&lt;td align="center"&gt;
+      &lt;table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#141414;border-radius:16px;border:1px solid rgba(201,168,76,0.18);overflow:hidden;"&gt;
+
+        &lt;!-- Gold top bar --&gt;
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Header --&gt;
+        &lt;tr&gt;&lt;td align="center" style="padding:36px 40px 24px;"&gt;
+          &lt;img src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
+               alt="AthloCode" width="100" style="display:block;margin:0 auto 20px;" /&gt;
+          &lt;h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 8px;letter-spacing:-0.3px;"&gt;Confirm Your Account&lt;/h1&gt;
+          &lt;p style="color:rgba(255,255,255,0.45);font-size:14px;margin:0;line-height:1.5;"&gt;
+            One last step — verify your email to activate your AthloCode membership.
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Divider --&gt;
+        &lt;tr&gt;&lt;td style="padding:0 40px;"&gt;&lt;div style="height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent);"&gt;&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Body --&gt;
+        &lt;tr&gt;&lt;td style="padding:32px 40px;"&gt;
+          &lt;p style="color:rgba(255,255,255,0.65);font-size:14px;line-height:1.7;margin:0 0 28px;"&gt;
+            Welcome to &lt;strong style="color:#C9A84C;"&gt;AthloCode&lt;/strong&gt; — your premium fitness coaching platform.
+            Click the button below to confirm your email address and get started.
+          &lt;/p&gt;
+
+          &lt;!-- CTA Button --&gt;
+          &lt;table width="100%" cellpadding="0" cellspacing="0"&gt;
+            &lt;tr&gt;&lt;td align="center"&gt;
+              &lt;a href="{{ .ConfirmationURL }}"
+                 style="display:inline-block;background:linear-gradient(135deg,#C9A84C,#b8973b);color:#0B0B0B;font-size:13px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;text-decoration:none;padding:14px 36px;border-radius:8px;margin-bottom:20px;"&gt;
+                ✓ &amp;nbsp;Confirm My Account
+              &lt;/a&gt;
+            &lt;/td&gt;&lt;/tr&gt;
+          &lt;/table&gt;
+
+          &lt;p style="color:rgba(255,255,255,0.3);font-size:12px;text-align:center;margin:16px 0 0;line-height:1.6;"&gt;
+            This link expires in &lt;strong style="color:rgba(255,255,255,0.5);"&gt;24 hours&lt;/strong&gt;.
+            If you did not create an account, you can safely ignore this email.
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- What's next --&gt;
+        &lt;tr&gt;&lt;td style="padding:0 40px 32px;"&gt;
+          &lt;div style="background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.12);border-radius:10px;padding:20px 24px;"&gt;
+            &lt;p style="color:#C9A84C;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin:0 0 12px;"&gt;What happens next&lt;/p&gt;
+            &lt;p style="color:rgba(255,255,255,0.5);font-size:13px;line-height:1.7;margin:0;"&gt;
+              ✓ &amp;nbsp;Complete your fitness onboarding questionnaire&lt;br/&gt;
+              ✓ &amp;nbsp;Get matched with your dedicated coach&lt;br/&gt;
+              ✓ &amp;nbsp;Receive your personalized meal &amp; workout plan
+            &lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Footer --&gt;
+        &lt;tr&gt;&lt;td style="padding:20px 40px 28px;border-top:1px solid rgba(255,255,255,0.05);"&gt;
+          &lt;p style="color:rgba(255,255,255,0.2);font-size:11px;text-align:center;margin:0;line-height:1.7;"&gt;
+            AthloCode · Premium Fitness Coaching · &lt;a href="mailto:support@athlocode.com" style="color:rgba(201,168,76,0.5);text-decoration:none;"&gt;support@athlocode.com&lt;/a&gt;&lt;br/&gt;
+            &lt;span style="font-size:10px;letter-spacing:0.08em;"&gt;© 2026 AthloCode. All rights reserved.&lt;/span&gt;
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Gold bottom bar --&gt;
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+      &lt;/table&gt;
+    &lt;/td&gt;&lt;/tr&gt;
+  &lt;/table&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     2. INVITE USER
+════════════════════════════════════════════════════════ -->
+<div class="template-section">
+  <h2>2. Invite User <span class="badge">Subject: You've been invited to AthloCode</span></h2>
+  <p>Supabase path: Authentication → Email Templates → Invite user</p>
+  <pre>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8" /&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;
+  &lt;title&gt;You're Invited to AthloCode&lt;/title&gt;
+&lt;/head&gt;
+&lt;body style="margin:0;padding:0;background:#0B0B0B;font-family:Arial,Helvetica,sans-serif;"&gt;
+
+  &lt;table width="100%" cellpadding="0" cellspacing="0" style="background:#0B0B0B;padding:40px 16px;"&gt;
+    &lt;tr&gt;&lt;td align="center"&gt;
+      &lt;table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#141414;border-radius:16px;border:1px solid rgba(201,168,76,0.18);overflow:hidden;"&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Header --&gt;
+        &lt;tr&gt;&lt;td align="center" style="padding:36px 40px 24px;"&gt;
+          &lt;img src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
+               alt="AthloCode" width="100" style="display:block;margin:0 auto 20px;" /&gt;
+          &lt;div style="display:inline-block;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.3);border-radius:20px;padding:4px 16px;margin-bottom:16px;"&gt;
+            &lt;span style="color:#C9A84C;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;"&gt;Exclusive Invitation&lt;/span&gt;
+          &lt;/div&gt;
+          &lt;h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 8px;"&gt;You've Been Invited&lt;/h1&gt;
+          &lt;p style="color:rgba(255,255,255,0.45);font-size:14px;margin:0;line-height:1.5;"&gt;
+            Your coach has added you to the AthloCode platform.
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="padding:0 40px;"&gt;&lt;div style="height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent);"&gt;&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Body --&gt;
+        &lt;tr&gt;&lt;td style="padding:32px 40px;"&gt;
+          &lt;p style="color:rgba(255,255,255,0.65);font-size:14px;line-height:1.7;margin:0 0 28px;"&gt;
+            Welcome to &lt;strong style="color:#C9A84C;"&gt;AthloCode&lt;/strong&gt;! You've been invited to join the platform
+            where you'll access your personalized meal plans, workout schedules, and direct messaging with your coach.
+          &lt;/p&gt;
+
+          &lt;table width="100%" cellpadding="0" cellspacing="0"&gt;
+            &lt;tr&gt;&lt;td align="center"&gt;
+              &lt;a href="{{ .ConfirmationURL }}"
+                 style="display:inline-block;background:linear-gradient(135deg,#C9A84C,#b8973b);color:#0B0B0B;font-size:13px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;text-decoration:none;padding:14px 36px;border-radius:8px;margin-bottom:20px;"&gt;
+                Accept Invitation →
+              &lt;/a&gt;
+            &lt;/td&gt;&lt;/tr&gt;
+          &lt;/table&gt;
+
+          &lt;p style="color:rgba(255,255,255,0.3);font-size:12px;text-align:center;margin:16px 0 0;"&gt;
+            This invitation expires in &lt;strong style="color:rgba(255,255,255,0.5);"&gt;72 hours&lt;/strong&gt;.
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Features --&gt;
+        &lt;tr&gt;&lt;td style="padding:0 40px 32px;"&gt;
+          &lt;div style="background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.12);border-radius:10px;padding:20px 24px;"&gt;
+            &lt;p style="color:#C9A84C;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin:0 0 12px;"&gt;Your Dashboard Includes&lt;/p&gt;
+            &lt;p style="color:rgba(255,255,255,0.5);font-size:13px;line-height:1.8;margin:0;"&gt;
+              🍽 &amp;nbsp;Personalized Meal Plans&lt;br/&gt;
+              💪 &amp;nbsp;Custom Workout Schedules&lt;br/&gt;
+              📊 &amp;nbsp;Progress Tracking &amp; Body Checks&lt;br/&gt;
+              💬 &amp;nbsp;Real-time Chat with Your Coach
+            &lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Footer --&gt;
+        &lt;tr&gt;&lt;td style="padding:20px 40px 28px;border-top:1px solid rgba(255,255,255,0.05);"&gt;
+          &lt;p style="color:rgba(255,255,255,0.2);font-size:11px;text-align:center;margin:0;line-height:1.7;"&gt;
+            AthloCode · Premium Fitness Coaching · &lt;a href="mailto:support@athlocode.com" style="color:rgba(201,168,76,0.5);text-decoration:none;"&gt;support@athlocode.com&lt;/a&gt;&lt;br/&gt;
+            &lt;span style="font-size:10px;"&gt;© 2026 AthloCode. All rights reserved.&lt;/span&gt;
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+      &lt;/table&gt;
+    &lt;/td&gt;&lt;/tr&gt;
+  &lt;/table&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     3. MAGIC LINK
+════════════════════════════════════════════════════════ -->
+<div class="template-section">
+  <h2>3. Magic Link <span class="badge">Subject: Your AthloCode sign-in link</span></h2>
+  <p>Supabase path: Authentication → Email Templates → Magic Link</p>
+  <pre>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8" /&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;
+  &lt;title&gt;Your AthloCode Sign-In Link&lt;/title&gt;
+&lt;/head&gt;
+&lt;body style="margin:0;padding:0;background:#0B0B0B;font-family:Arial,Helvetica,sans-serif;"&gt;
+
+  &lt;table width="100%" cellpadding="0" cellspacing="0" style="background:#0B0B0B;padding:40px 16px;"&gt;
+    &lt;tr&gt;&lt;td align="center"&gt;
+      &lt;table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#141414;border-radius:16px;border:1px solid rgba(201,168,76,0.18);overflow:hidden;"&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Header --&gt;
+        &lt;tr&gt;&lt;td align="center" style="padding:36px 40px 24px;"&gt;
+          &lt;img src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
+               alt="AthloCode" width="100" style="display:block;margin:0 auto 20px;" /&gt;
+          &lt;!-- Lightning icon --&gt;
+          &lt;div style="width:52px;height:52px;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.25);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;font-size:22px;line-height:52px;"&gt;⚡&lt;/div&gt;
+          &lt;h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 8px;"&gt;Your Sign-In Link&lt;/h1&gt;
+          &lt;p style="color:rgba(255,255,255,0.45);font-size:14px;margin:0;line-height:1.5;"&gt;
+            No password needed. Click once to access your dashboard.
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="padding:0 40px;"&gt;&lt;div style="height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent);"&gt;&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Body --&gt;
+        &lt;tr&gt;&lt;td style="padding:32px 40px;"&gt;
+          &lt;p style="color:rgba(255,255,255,0.65);font-size:14px;line-height:1.7;margin:0 0 28px;"&gt;
+            We received a sign-in request for your &lt;strong style="color:#C9A84C;"&gt;AthloCode&lt;/strong&gt; account.
+            Use the secure link below — it's valid for a single use only.
+          &lt;/p&gt;
+
+          &lt;table width="100%" cellpadding="0" cellspacing="0"&gt;
+            &lt;tr&gt;&lt;td align="center"&gt;
+              &lt;a href="{{ .ConfirmationURL }}"
+                 style="display:inline-block;background:linear-gradient(135deg,#C9A84C,#b8973b);color:#0B0B0B;font-size:13px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;text-decoration:none;padding:14px 36px;border-radius:8px;"&gt;
+                ⚡ &amp;nbsp;Sign In to AthloCode
+              &lt;/a&gt;
+            &lt;/td&gt;&lt;/tr&gt;
+          &lt;/table&gt;
+
+          &lt;!-- Security notice --&gt;
+          &lt;div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:16px 20px;margin-top:24px;"&gt;
+            &lt;p style="color:rgba(255,255,255,0.35);font-size:12px;margin:0;line-height:1.7;"&gt;
+              🔒 &amp;nbsp;This link is &lt;strong style="color:rgba(255,255,255,0.55);"&gt;single-use only&lt;/strong&gt; and expires in &lt;strong style="color:rgba(255,255,255,0.55);"&gt;1 hour&lt;/strong&gt;.&lt;br/&gt;
+              If you didn't request this, no action is needed — your account is safe.
+            &lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Footer --&gt;
+        &lt;tr&gt;&lt;td style="padding:20px 40px 28px;border-top:1px solid rgba(255,255,255,0.05);"&gt;
+          &lt;p style="color:rgba(255,255,255,0.2);font-size:11px;text-align:center;margin:0;line-height:1.7;"&gt;
+            AthloCode · Premium Fitness Coaching · &lt;a href="mailto:support@athlocode.com" style="color:rgba(201,168,76,0.5);text-decoration:none;"&gt;support@athlocode.com&lt;/a&gt;&lt;br/&gt;
+            &lt;span style="font-size:10px;"&gt;© 2026 AthloCode. All rights reserved.&lt;/span&gt;
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+      &lt;/table&gt;
+    &lt;/td&gt;&lt;/tr&gt;
+  &lt;/table&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     4. CHANGE EMAIL ADDRESS
+════════════════════════════════════════════════════════ -->
+<div class="template-section">
+  <h2>4. Change Email Address <span class="badge">Subject: Confirm your new email — AthloCode</span></h2>
+  <p>Supabase path: Authentication → Email Templates → Change Email Address</p>
+  <pre>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8" /&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;
+  &lt;title&gt;Confirm Your New Email — AthloCode&lt;/title&gt;
+&lt;/head&gt;
+&lt;body style="margin:0;padding:0;background:#0B0B0B;font-family:Arial,Helvetica,sans-serif;"&gt;
+
+  &lt;table width="100%" cellpadding="0" cellspacing="0" style="background:#0B0B0B;padding:40px 16px;"&gt;
+    &lt;tr&gt;&lt;td align="center"&gt;
+      &lt;table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#141414;border-radius:16px;border:1px solid rgba(201,168,76,0.18);overflow:hidden;"&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Header --&gt;
+        &lt;tr&gt;&lt;td align="center" style="padding:36px 40px 24px;"&gt;
+          &lt;img src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
+               alt="AthloCode" width="100" style="display:block;margin:0 auto 20px;" /&gt;
+          &lt;h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 8px;"&gt;Confirm Email Change&lt;/h1&gt;
+          &lt;p style="color:rgba(255,255,255,0.45);font-size:14px;margin:0;line-height:1.5;"&gt;
+            Verify your new email address to complete the update.
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="padding:0 40px;"&gt;&lt;div style="height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent);"&gt;&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Body --&gt;
+        &lt;tr&gt;&lt;td style="padding:32px 40px;"&gt;
+          &lt;p style="color:rgba(255,255,255,0.65);font-size:14px;line-height:1.7;margin:0 0 20px;"&gt;
+            You requested to change the email address on your &lt;strong style="color:#C9A84C;"&gt;AthloCode&lt;/strong&gt; account.
+            Your new email address is:
+          &lt;/p&gt;
+
+          &lt;!-- New email highlight --&gt;
+          &lt;div style="background:rgba(201,168,76,0.07);border:1px solid rgba(201,168,76,0.2);border-radius:8px;padding:14px 20px;margin-bottom:24px;text-align:center;"&gt;
+            &lt;p style="color:#C9A84C;font-size:15px;font-weight:700;margin:0;letter-spacing:0.02em;"&gt;{{ .NewEmail }}&lt;/p&gt;
+          &lt;/div&gt;
+
+          &lt;table width="100%" cellpadding="0" cellspacing="0"&gt;
+            &lt;tr&gt;&lt;td align="center"&gt;
+              &lt;a href="{{ .ConfirmationURL }}"
+                 style="display:inline-block;background:linear-gradient(135deg,#C9A84C,#b8973b);color:#0B0B0B;font-size:13px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;text-decoration:none;padding:14px 36px;border-radius:8px;"&gt;
+                ✓ &amp;nbsp;Confirm New Email
+              &lt;/a&gt;
+            &lt;/td&gt;&lt;/tr&gt;
+          &lt;/table&gt;
+
+          &lt;!-- Security notice --&gt;
+          &lt;div style="background:rgba(255,100,100,0.05);border:1px solid rgba(255,100,100,0.15);border-radius:8px;padding:14px 18px;margin-top:24px;"&gt;
+            &lt;p style="color:rgba(255,180,180,0.7);font-size:12px;margin:0;line-height:1.7;"&gt;
+              ⚠️ &amp;nbsp;If you did &lt;strong&gt;not&lt;/strong&gt; request this change, please contact us immediately at
+              &lt;a href="mailto:support@athlocode.com" style="color:#C9A84C;text-decoration:none;"&gt;support@athlocode.com&lt;/a&gt;
+            &lt;/p&gt;
+          &lt;/div&gt;
+
+          &lt;p style="color:rgba(255,255,255,0.3);font-size:12px;text-align:center;margin:16px 0 0;"&gt;
+            Link expires in &lt;strong style="color:rgba(255,255,255,0.5);"&gt;24 hours&lt;/strong&gt;.
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Footer --&gt;
+        &lt;tr&gt;&lt;td style="padding:20px 40px 28px;border-top:1px solid rgba(255,255,255,0.05);"&gt;
+          &lt;p style="color:rgba(255,255,255,0.2);font-size:11px;text-align:center;margin:0;line-height:1.7;"&gt;
+            AthloCode · Premium Fitness Coaching · &lt;a href="mailto:support@athlocode.com" style="color:rgba(201,168,76,0.5);text-decoration:none;"&gt;support@athlocode.com&lt;/a&gt;&lt;br/&gt;
+            &lt;span style="font-size:10px;"&gt;© 2026 AthloCode. All rights reserved.&lt;/span&gt;
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+      &lt;/table&gt;
+    &lt;/td&gt;&lt;/tr&gt;
+  &lt;/table&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     5. RESET PASSWORD
+════════════════════════════════════════════════════════ -->
+<div class="template-section">
+  <h2>5. Reset Password <span class="badge">Subject: Reset your AthloCode password</span></h2>
+  <p>Supabase path: Authentication → Email Templates → Reset Password</p>
+  <pre>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8" /&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;
+  &lt;title&gt;Reset Your AthloCode Password&lt;/title&gt;
+&lt;/head&gt;
+&lt;body style="margin:0;padding:0;background:#0B0B0B;font-family:Arial,Helvetica,sans-serif;"&gt;
+
+  &lt;table width="100%" cellpadding="0" cellspacing="0" style="background:#0B0B0B;padding:40px 16px;"&gt;
+    &lt;tr&gt;&lt;td align="center"&gt;
+      &lt;table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#141414;border-radius:16px;border:1px solid rgba(201,168,76,0.18);overflow:hidden;"&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Header --&gt;
+        &lt;tr&gt;&lt;td align="center" style="padding:36px 40px 24px;"&gt;
+          &lt;img src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
+               alt="AthloCode" width="100" style="display:block;margin:0 auto 20px;" /&gt;
+          &lt;!-- Lock icon --&gt;
+          &lt;div style="width:52px;height:52px;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.25);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;font-size:22px;line-height:52px;"&gt;🔑&lt;/div&gt;
+          &lt;h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 8px;"&gt;Reset Your Password&lt;/h1&gt;
+          &lt;p style="color:rgba(255,255,255,0.45);font-size:14px;margin:0;line-height:1.5;"&gt;
+            We received a password reset request for your account.
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="padding:0 40px;"&gt;&lt;div style="height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent);"&gt;&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Body --&gt;
+        &lt;tr&gt;&lt;td style="padding:32px 40px;"&gt;
+          &lt;p style="color:rgba(255,255,255,0.65);font-size:14px;line-height:1.7;margin:0 0 28px;"&gt;
+            No worries — it happens to everyone. Click the button below to create a new password
+            for your &lt;strong style="color:#C9A84C;"&gt;AthloCode&lt;/strong&gt; account.
+          &lt;/p&gt;
+
+          &lt;table width="100%" cellpadding="0" cellspacing="0"&gt;
+            &lt;tr&gt;&lt;td align="center"&gt;
+              &lt;a href="{{ .ConfirmationURL }}"
+                 style="display:inline-block;background:linear-gradient(135deg,#C9A84C,#b8973b);color:#0B0B0B;font-size:13px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;text-decoration:none;padding:14px 36px;border-radius:8px;"&gt;
+                🔑 &amp;nbsp;Reset My Password
+              &lt;/a&gt;
+            &lt;/td&gt;&lt;/tr&gt;
+          &lt;/table&gt;
+
+          &lt;!-- Tips --&gt;
+          &lt;div style="background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.12);border-radius:10px;padding:18px 22px;margin-top:24px;"&gt;
+            &lt;p style="color:#C9A84C;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin:0 0 10px;"&gt;Password Tips&lt;/p&gt;
+            &lt;p style="color:rgba(255,255,255,0.45);font-size:12px;line-height:1.8;margin:0;"&gt;
+              ✓ &amp;nbsp;At least 8 characters&lt;br/&gt;
+              ✓ &amp;nbsp;Mix uppercase &amp; lowercase letters&lt;br/&gt;
+              ✓ &amp;nbsp;Include numbers &amp; special characters&lt;br/&gt;
+              ✓ &amp;nbsp;Don't reuse a previous password
+            &lt;/p&gt;
+          &lt;/div&gt;
+
+          &lt;!-- Security notice --&gt;
+          &lt;div style="background:rgba(255,100,100,0.05);border:1px solid rgba(255,100,100,0.12);border-radius:8px;padding:14px 18px;margin-top:16px;"&gt;
+            &lt;p style="color:rgba(255,180,180,0.7);font-size:12px;margin:0;line-height:1.7;"&gt;
+              ⚠️ &amp;nbsp;This link expires in &lt;strong&gt;1 hour&lt;/strong&gt;.
+              If you didn't request a reset, contact us at
+              &lt;a href="mailto:support@athlocode.com" style="color:#C9A84C;text-decoration:none;"&gt;support@athlocode.com&lt;/a&gt;
+            &lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Footer --&gt;
+        &lt;tr&gt;&lt;td style="padding:20px 40px 28px;border-top:1px solid rgba(255,255,255,0.05);"&gt;
+          &lt;p style="color:rgba(255,255,255,0.2);font-size:11px;text-align:center;margin:0;line-height:1.7;"&gt;
+            AthloCode · Premium Fitness Coaching · &lt;a href="mailto:support@athlocode.com" style="color:rgba(201,168,76,0.5);text-decoration:none;"&gt;support@athlocode.com&lt;/a&gt;&lt;br/&gt;
+            &lt;span style="font-size:10px;"&gt;© 2026 AthloCode. All rights reserved.&lt;/span&gt;
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+      &lt;/table&gt;
+    &lt;/td&gt;&lt;/tr&gt;
+  &lt;/table&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     6. REAUTHENTICATION
+════════════════════════════════════════════════════════ -->
+<div class="template-section">
+  <h2>6. Reauthentication <span class="badge">Subject: Your AthloCode verification code</span></h2>
+  <p>Supabase path: Authentication → Email Templates → Reauthentication</p>
+  <pre>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8" /&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;
+  &lt;title&gt;Your AthloCode Verification Code&lt;/title&gt;
+&lt;/head&gt;
+&lt;body style="margin:0;padding:0;background:#0B0B0B;font-family:Arial,Helvetica,sans-serif;"&gt;
+
+  &lt;table width="100%" cellpadding="0" cellspacing="0" style="background:#0B0B0B;padding:40px 16px;"&gt;
+    &lt;tr&gt;&lt;td align="center"&gt;
+      &lt;table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#141414;border-radius:16px;border:1px solid rgba(201,168,76,0.18);overflow:hidden;"&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Header --&gt;
+        &lt;tr&gt;&lt;td align="center" style="padding:36px 40px 24px;"&gt;
+          &lt;img src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
+               alt="AthloCode" width="100" style="display:block;margin:0 auto 20px;" /&gt;
+          &lt;div style="width:52px;height:52px;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.25);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;font-size:22px;line-height:52px;"&gt;🛡️&lt;/div&gt;
+          &lt;h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 8px;"&gt;Security Verification&lt;/h1&gt;
+          &lt;p style="color:rgba(255,255,255,0.45);font-size:14px;margin:0;line-height:1.5;"&gt;
+            Enter this code to confirm your identity.
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="padding:0 40px;"&gt;&lt;div style="height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent);"&gt;&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Body --&gt;
+        &lt;tr&gt;&lt;td style="padding:32px 40px;"&gt;
+          &lt;p style="color:rgba(255,255,255,0.65);font-size:14px;line-height:1.7;margin:0 0 24px;"&gt;
+            You're attempting a sensitive action on your &lt;strong style="color:#C9A84C;"&gt;AthloCode&lt;/strong&gt; account.
+            Enter the code below to verify it's really you.
+          &lt;/p&gt;
+
+          &lt;!-- OTP Code Box --&gt;
+          &lt;div style="background:rgba(201,168,76,0.07);border:2px solid rgba(201,168,76,0.3);border-radius:12px;padding:24px 20px;text-align:center;margin-bottom:24px;"&gt;
+            &lt;p style="color:rgba(255,255,255,0.35);font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;margin:0 0 10px;"&gt;Verification Code&lt;/p&gt;
+            &lt;p style="color:#C9A84C;font-size:38px;font-weight:900;letter-spacing:0.22em;margin:0;font-family:'Courier New',monospace;"&gt;{{ .Token }}&lt;/p&gt;
+          &lt;/div&gt;
+
+          &lt;!-- Security notice --&gt;
+          &lt;div style="background:rgba(255,100,100,0.05);border:1px solid rgba(255,100,100,0.12);border-radius:8px;padding:14px 18px;"&gt;
+            &lt;p style="color:rgba(255,180,180,0.7);font-size:12px;margin:0;line-height:1.7;"&gt;
+              ⚠️ &amp;nbsp;This code expires in &lt;strong&gt;10 minutes&lt;/strong&gt;.&lt;br/&gt;
+              Never share this code with anyone — AthloCode will never ask for it.&lt;br/&gt;
+              If this wasn't you, secure your account immediately at
+              &lt;a href="mailto:support@athlocode.com" style="color:#C9A84C;text-decoration:none;"&gt;support@athlocode.com&lt;/a&gt;
+            &lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;!-- Footer --&gt;
+        &lt;tr&gt;&lt;td style="padding:20px 40px 28px;border-top:1px solid rgba(255,255,255,0.05);"&gt;
+          &lt;p style="color:rgba(255,255,255,0.2);font-size:11px;text-align:center;margin:0;line-height:1.7;"&gt;
+            AthloCode · Premium Fitness Coaching · &lt;a href="mailto:support@athlocode.com" style="color:rgba(201,168,76,0.5);text-decoration:none;"&gt;support@athlocode.com&lt;/a&gt;&lt;br/&gt;
+            &lt;span style="font-size:10px;"&gt;© 2026 AthloCode. All rights reserved.&lt;/span&gt;
+          &lt;/p&gt;
+        &lt;/td&gt;&lt;/tr&gt;
+
+        &lt;tr&gt;&lt;td style="height:3px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);"&gt;&lt;/td&gt;&lt;/tr&gt;
+
+      &lt;/table&gt;
+    &lt;/td&gt;&lt;/tr&gt;
+  &lt;/table&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</div>
+
+<div class="divider"></div>
+
+<!-- Quick Reference -->
+<div style="background:#141414;border:1px solid rgba(201,168,76,0.18);border-radius:12px;padding:28px 32px;margin-top:20px;">
+  <p style="color:#C9A84C;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;margin:0 0 16px;">Quick Reference — Supabase Variables Used</p>
+  <table style="width:100%;font-size:12px;border-collapse:collapse;">
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <td style="padding:8px 12px;color:#C9A84C;font-family:monospace;font-weight:700;">{{ .ConfirmationURL }}</td>
+      <td style="padding:8px 12px;color:rgba(255,255,255,0.5);">Full magic URL — Confirm Signup, Invite, Magic Link, Change Email, Reset Password</td>
+    </tr>
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <td style="padding:8px 12px;color:#C9A84C;font-family:monospace;font-weight:700;">{{ .Token }}</td>
+      <td style="padding:8px 12px;color:rgba(255,255,255,0.5);">OTP 6-digit code — Reauthentication template only</td>
+    </tr>
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <td style="padding:8px 12px;color:#C9A84C;font-family:monospace;font-weight:700;">{{ .NewEmail }}</td>
+      <td style="padding:8px 12px;color:rgba(255,255,255,0.5);">New email address — Change Email template only</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;color:#C9A84C;font-family:monospace;font-weight:700;">{{ .SiteURL }}</td>
+      <td style="padding:8px 12px;color:rgba(255,255,255,0.5);">Your site URL — available in all templates if needed</td>
+    </tr>
+  </table>
+</div>
+
+</body>
+</html>

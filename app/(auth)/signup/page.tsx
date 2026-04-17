@@ -460,11 +460,13 @@ export default function SignUpPage() {
                 Back to Website
               </Link>
 
-              <img
-                src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
-                alt="AthloCode"
-                className="su-brand-logo"
-              />
+              <Link href="/">
+                <img
+                  src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
+                  alt="AthloCode"
+                  className="su-brand-logo hover:opacity-80 transition-opacity"
+                />
+              </Link>
 
               <div className="su-brand-pill">
                 <span className="su-brand-dot" />
@@ -650,11 +652,14 @@ export default function SignUpPage() {
               {!emailSent && <>
               {/* Mobile logo */}
               <div className="su-mobile-logo">
-                <img
-                  src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
-                  alt="AthloCode"
-                  style={{ height: 44, width: 'auto', objectFit: 'contain' }}
-                />
+                <Link href="/">
+                  <img
+                    src="https://res.cloudinary.com/dqiuwzvfb/image/upload/v1775629677/69007823-DC7E-42E1-AF8E-E57E11810549-Photoroom_nluyul.png"
+                    alt="AthloCode"
+                    style={{ height: 44, width: 'auto', objectFit: 'contain' }}
+                    className="hover:opacity-80 transition-opacity"
+                  />
+                </Link>
               </div>
 
               {/* Header */}

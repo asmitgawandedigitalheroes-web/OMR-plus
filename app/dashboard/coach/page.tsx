@@ -155,6 +155,8 @@ function OverviewTab({
   onNavigate: (tab: string) => void;
 }) {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const coachFirstName = user?.profile?.full_name?.split(' ')[0] ?? 'Coach';
   const active = clients.filter(c => c.subscription_status === 'active').length;
 
   const stats = [
@@ -216,7 +218,7 @@ function OverviewTab({
           {t('dash.coachPortal')}
         </div>
         <h2 dir="auto" style={{ fontSize: '1.6rem', fontWeight: 700, color: 'white', marginBottom: '0.35rem' }}>
-          {t('coach.welcome')}
+          {t('coach.welcomeBack')}&nbsp;<span style={{ color: '#C9A84C' }}>{coachFirstName}</span>
         </h2>
         <p dir="auto" style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.35)' }}>
           {t('coach.overview.summary')}
@@ -410,7 +412,7 @@ function ClientsTab({
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <p dir="auto" className="ds-section-title">{t('coach.myClients')}</p>
-          <p dir="ltr" className="ds-section-sub">{clients.length} {t('admin.clients')}</p>
+          <p dir="ltr" className="ds-section-sub">{clients.length} {clients.length === 1 ? t('coach.client') : t('admin.clients')}</p>
         </div>
         <button className="ds-btn-gold" onClick={() => setShowAddForm(true)}>
           <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1231,81 +1233,171 @@ function WorkoutBuilderTab({ clients, preselectedClientId }: { clients: ClientPr
           </div>
         </div>
 
+        {/* ── Days ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {days.map((day, dayIdx) => (
-          <div key={dayIdx} className="ds-card" style={{ padding: '1.5rem', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-              <input className="ds-input" placeholder="Day label (e.g. Push Day)" value={day.day_label}
-                onChange={e => updateDay(dayIdx, 'day_label', e.target.value)} style={{ flex: 1, minWidth: 140 }} />
-              <input className="ds-input" placeholder="Focus (e.g. Chest & Shoulders)" value={day.focus ?? ''}
-                onChange={e => updateDay(dayIdx, 'focus', e.target.value)} style={{ flex: 1, minWidth: 140 }} />
-              <button onClick={() => setDays(prev => prev.filter((_, i) => i !== dayIdx))}
-                style={{ background: 'none', border: 'none', color: 'rgba(248,113,113,0.5)', cursor: 'pointer', padding: '4px 8px' }}>{t('coach.workout.removeDay')}</button>
-            </div>
-            {day.exercises.map((ex, exIdx) => (
-              <div key={exIdx} style={{ marginBottom: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '0.75rem' }}>
-                <div className="coach-ex-row" style={{ display: 'grid', gridTemplateColumns: '130px 2fr 80px 90px 100px 1fr auto', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                  <Select
-                    value={ex.exercise_category ?? ''}
-                    onChange={v => updateExercise(dayIdx, exIdx, 'exercise_category', v || null)}
-                    placeholder="Category"
-                    options={EXERCISE_CATEGORIES.map(c => ({ value: c, label: c }))}
-                  />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                    <input className="ds-input" placeholder="Exercise name (EN)" value={ex.exercise_name}
-                      onChange={e => updateExercise(dayIdx, exIdx, 'exercise_name', e.target.value)} />
-                    <input className="ds-input" dir="rtl" placeholder="اسم التمرين (AR)" value={ex.exercise_name_ar ?? ''}
-                      onChange={e => updateExercise(dayIdx, exIdx, 'exercise_name_ar', e.target.value || null)} />
-                  </div>
-                  <input className="ds-input" type="number" placeholder="Sets" value={ex.sets ?? ''}
-                    onChange={e => updateExercise(dayIdx, exIdx, 'sets', e.target.value ? Number(e.target.value) : null)} />
-                  <input className="ds-input" placeholder="Reps" value={ex.reps ?? ''}
-                    onChange={e => updateExercise(dayIdx, exIdx, 'reps', e.target.value)} />
-                  <input className="ds-input" type="number" placeholder="Rest (s)" value={ex.rest_seconds ?? ''}
-                    onChange={e => updateExercise(dayIdx, exIdx, 'rest_seconds', e.target.value ? Number(e.target.value) : null)} />
-                  <input className="ds-input" placeholder="Notes" value={ex.notes ?? ''}
-                    onChange={e => updateExercise(dayIdx, exIdx, 'notes', e.target.value)} />
-                  <button onClick={() => setDays(prev => prev.map((d, i) => i === dayIdx ? { ...d, exercises: d.exercises.filter((_, j) => j !== exIdx) } : d))}
-                    style={{ background: 'none', border: 'none', color: 'rgba(248,113,113,0.5)', cursor: 'pointer', padding: 4 }}>
-                    <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-                {/* Video attachment row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.35rem' }}>
-                  {ex.video_url ? (
-                    <>
-                      <span style={{ fontSize: '0.72rem', color: 'rgba(201,168,76,0.8)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <svg style={{ width: 12, height: 12 }} fill="currentColor" viewBox="0 0 24 24"><path d="M4 8H2v12a2 2 0 0 0 2 2h12v-2H4V8zm16-4H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-8 11V7l6 4-6 4z"/></svg>
-                        {t('coach.workout.videoAttached')}
-                      </span>
-                      <button onClick={() => updateExercise(dayIdx, exIdx, 'video_url', null)}
-                        style={{ background: 'none', border: 'none', fontSize: '0.68rem', color: 'rgba(248,113,113,0.5)', cursor: 'pointer', padding: 0 }}>{t('coach.workout.removeVideo')}</button>
-                      <button onClick={() => setPickerTarget({ dayIdx, exIdx })}
-                        style={{ background: 'none', border: 'none', fontSize: '0.68rem', color: 'rgba(201,168,76,0.6)', cursor: 'pointer', padding: 0 }}>{t('coach.workout.changeVideo')}</button>
-                    </>
-                  ) : (
-                    <button onClick={() => setPickerTarget({ dayIdx, exIdx })}
-                      style={{ background: 'none', border: '1px dashed rgba(201,168,76,0.25)', borderRadius: 6, padding: '0.25rem 0.6rem', fontSize: '0.7rem', color: 'rgba(201,168,76,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <svg style={{ width: 11, height: 11 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5 20.47 6m0 0-5.47.75M20.47 6l-3.53 5.25M3.53 18l5.47-.75M3.53 18l3.53-5.25M3.53 18 8.25 13.5m6-6L9.53 12m0 0 .75 5.47M9.53 12 4.5 16.5" /></svg>
-                      {t('coach.workout.attachVideo')}
-                    </button>
-                  )}
-                </div>
+          <div key={dayIdx} style={{ border: '1px solid rgba(201,168,76,0.18)', borderRadius: 14, overflow: 'hidden' }}>
+
+            {/* Day header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.85rem 1.1rem', background: 'rgba(201,168,76,0.05)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              {/* Day number badge */}
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(201,168,76,0.14)', border: '1px solid rgba(201,168,76,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#C9A84C' }}>{dayIdx + 1}</span>
               </div>
-            ))}
-            <button className="ds-btn-outline" style={{ marginTop: '0.5rem', padding: '0.45rem 0.9rem', fontSize: '0.75rem' }} onClick={() => addExercise(dayIdx)}>
-              {t('coach.workout.addExercise')}
-            </button>
+              {/* Day label */}
+              <input
+                className="ds-input"
+                placeholder="Day name (e.g. Push Day)"
+                value={day.day_label}
+                onChange={e => updateDay(dayIdx, 'day_label', e.target.value)}
+                style={{ flex: 1, minWidth: 120, fontWeight: 600 }}
+              />
+              {/* Focus area */}
+              <input
+                className="ds-input"
+                placeholder="Focus (e.g. Chest & Shoulders)"
+                value={day.focus ?? ''}
+                onChange={e => updateDay(dayIdx, 'focus', e.target.value)}
+                style={{ flex: 1, minWidth: 140 }}
+              />
+              {/* Remove day */}
+              <button
+                onClick={() => setDays(prev => prev.filter((_, i) => i !== dayIdx))}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 7, color: 'rgba(248,113,113,0.6)', cursor: 'pointer', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.08)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(248,113,113,0.4)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(248,113,113,0.2)'; }}
+              >
+                <svg style={{ width: 12, height: 12 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                {t('coach.workout.removeDay')}
+              </button>
+            </div>
+
+            {/* Exercises */}
+            <div style={{ padding: '0.85rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem', background: 'rgba(255,255,255,0.01)' }}>
+
+              {/* Exercise column headers */}
+              {day.exercises.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 68px 80px 80px 1fr 32px', gap: '0.5rem', padding: '0 0.1rem' }}>
+                  {['Category','Exercise Name','Sets','Reps','Rest (s)','Notes',''].map((h, i) => (
+                    <span key={i} style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{h}</span>
+                  ))}
+                </div>
+              )}
+
+              {day.exercises.map((ex, exIdx) => (
+                <div key={exIdx} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '0.75rem 0.85rem' }}>
+
+                  {/* Exercise number + main row */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', marginBottom: '0.55rem' }}>
+                    {/* Index */}
+                    <div style={{ width: 22, height: 22, borderRadius: 6, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                      <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>{exIdx + 1}</span>
+                    </div>
+                    {/* Fields grid */}
+                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '140px 1fr 68px 80px 80px 1fr 32px', gap: '0.5rem', alignItems: 'center' }}>
+                      {/* Category */}
+                      <Select
+                        value={ex.exercise_category ?? ''}
+                        onChange={v => updateExercise(dayIdx, exIdx, 'exercise_category', v || null)}
+                        placeholder="Category"
+                        searchable={false}
+                        options={EXERCISE_CATEGORIES.map(c => ({ value: c, label: c }))}
+                      />
+                      {/* Exercise name EN + AR stacked */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <input className="ds-input" placeholder="Exercise name (EN)" value={ex.exercise_name}
+                          onChange={e => updateExercise(dayIdx, exIdx, 'exercise_name', e.target.value)}
+                          style={{ fontSize: '0.8rem' }} />
+                        <input className="ds-input" dir="rtl" placeholder="اسم التمرين" value={ex.exercise_name_ar ?? ''}
+                          onChange={e => updateExercise(dayIdx, exIdx, 'exercise_name_ar', e.target.value || null)}
+                          style={{ fontSize: '0.8rem' }} />
+                      </div>
+                      {/* Sets */}
+                      <input className="ds-input" type="number" placeholder="—" value={ex.sets ?? ''}
+                        onChange={e => updateExercise(dayIdx, exIdx, 'sets', e.target.value ? Number(e.target.value) : null)}
+                        style={{ textAlign: 'center', fontSize: '0.82rem' }} />
+                      {/* Reps */}
+                      <input className="ds-input" placeholder="—" value={ex.reps ?? ''}
+                        onChange={e => updateExercise(dayIdx, exIdx, 'reps', e.target.value)}
+                        style={{ textAlign: 'center', fontSize: '0.82rem' }} />
+                      {/* Rest */}
+                      <input className="ds-input" type="number" placeholder="—" value={ex.rest_seconds ?? ''}
+                        onChange={e => updateExercise(dayIdx, exIdx, 'rest_seconds', e.target.value ? Number(e.target.value) : null)}
+                        style={{ textAlign: 'center', fontSize: '0.82rem' }} />
+                      {/* Notes */}
+                      <input className="ds-input" placeholder="Optional notes…" value={ex.notes ?? ''}
+                        onChange={e => updateExercise(dayIdx, exIdx, 'notes', e.target.value)}
+                        style={{ fontSize: '0.8rem' }} />
+                      {/* Remove exercise */}
+                      <button
+                        onClick={() => setDays(prev => prev.map((d, i) => i === dayIdx ? { ...d, exercises: d.exercises.filter((_, j) => j !== exIdx) } : d))}
+                        style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.15)', borderRadius: 7, color: 'rgba(248,113,113,0.55)', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.14)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.06)'; }}
+                      >
+                        <svg style={{ width: 12, height: 12 }} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Video row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingLeft: '1.85rem' }}>
+                    {ex.video_url ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.18)', borderRadius: 6, padding: '0.25rem 0.65rem' }}>
+                        <svg style={{ width: 11, height: 11, color: '#C9A84C', flexShrink: 0 }} fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <span style={{ fontSize: '0.7rem', color: 'rgba(201,168,76,0.85)', fontWeight: 500 }}>{t('coach.workout.videoAttached')}</span>
+                        <button onClick={() => setPickerTarget({ dayIdx, exIdx })}
+                          style={{ background: 'none', border: 'none', fontSize: '0.68rem', color: 'rgba(201,168,76,0.55)', cursor: 'pointer', padding: 0 }}>{t('coach.workout.changeVideo')}</button>
+                        <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.7rem' }}>·</span>
+                        <button onClick={() => updateExercise(dayIdx, exIdx, 'video_url', null)}
+                          style={{ background: 'none', border: 'none', fontSize: '0.68rem', color: 'rgba(248,113,113,0.5)', cursor: 'pointer', padding: 0 }}>{t('coach.workout.removeVideo')}</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setPickerTarget({ dayIdx, exIdx })}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 6, padding: '0.22rem 0.6rem', fontSize: '0.69rem', color: 'rgba(255,255,255,0.28)', cursor: 'pointer', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(201,168,76,0.3)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(201,168,76,0.6)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.28)'; }}
+                      >
+                        <svg style={{ width: 11, height: 11 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72m0 0-5.47.75m5.47-.75-3.53 5.25" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                        {t('coach.workout.attachVideo')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Add exercise button */}
+              <button
+                className="ds-btn-outline"
+                style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.9rem', fontSize: '0.75rem', marginTop: day.exercises.length > 0 ? '0.25rem' : 0 }}
+                onClick={() => addExercise(dayIdx)}
+              >
+                <svg style={{ width: 12, height: 12 }} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                {t('coach.workout.addExercise')}
+              </button>
+            </div>
           </div>
         ))}
+        </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-          <button className="ds-btn-outline" onClick={addDay}>{t('coach.workout.addDay')}</button>
-          <button className="ds-btn-gold" disabled={saving || !title.trim()} onClick={savePlan}>
-            {saving ? t('coach.workout.saving') : t('coach.workout.savePlan')}
+        {/* ── Modal footer actions ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          <button
+            className="ds-btn-outline"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            onClick={addDay}
+          >
+            <svg style={{ width: 13, height: 13 }} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            {t('coach.workout.addDay')}
           </button>
-          <button className="ds-btn-outline" onClick={() => { setView('list'); setTitle(''); setDescription(''); setDays([]); setEditPlan(null); }}>
-            {t('coach.cancelBtn')}
-          </button>
+          <div style={{ display: 'flex', gap: '0.65rem' }}>
+            <button className="ds-btn-outline" onClick={() => { setView('list'); setTitle(''); setDescription(''); setDays([]); setEditPlan(null); }}>
+              {t('coach.cancelBtn')}
+            </button>
+            <button className="ds-btn-gold" disabled={saving || !title.trim()} onClick={savePlan}>
+              {saving ? t('coach.workout.saving') : t('coach.workout.savePlan')}
+            </button>
+          </div>
         </div>
 
         {/* ── Video Picker Modal (kept as-is, nested inside workout modal) ── */}

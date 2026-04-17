@@ -9,6 +9,7 @@ interface PublicPlan {
   tagline: string | null;
   cta_text: string | null;
   price_sar: number;
+  billing_type: 'monthly' | 'one_time';
   features: string[];
   is_featured: boolean;
   sort_order: number;
@@ -170,9 +171,16 @@ export default function PricingSection({ plans }: { plans: PublicPlan[] }) {
                       }}>
                       {plan.price_sar}
                     </span>
-                    <span className="text-sm font-medium mt-auto mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                      {t('pricing.perMonth')}
-                    </span>
+                    {plan.billing_type !== 'one_time' && (
+                      <span className="text-sm font-medium mt-auto mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                        {t('pricing.perMonth')}
+                      </span>
+                    )}
+                    {plan.billing_type === 'one_time' && (
+                      <span className="text-sm font-medium mt-auto mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                        {t('pricing.oneTime')}
+                      </span>
+                    )}
                   </div>
                   {plan.description && (
                     <p dir="auto" className="text-[13px] leading-relaxed mt-3" style={{ color: 'rgba(255,255,255,0.38)' }}>{plan.description}</p>

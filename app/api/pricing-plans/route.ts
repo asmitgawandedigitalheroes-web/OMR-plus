@@ -16,6 +16,7 @@ export interface PublicPlan {
   tagline: string | null;
   cta_text: string | null;
   price_sar: number;
+  billing_type: 'monthly' | 'one_time';
   features: string[];
   is_featured: boolean;
   sort_order: number;
@@ -27,7 +28,7 @@ export async function GET() {
   try {
     const { data, error } = await supabaseAdmin
       .from('pricing_plans')
-      .select('id, name, description, tagline, cta_text, price_sar, features, is_featured, sort_order')
+      .select('id, name, description, tagline, cta_text, price_sar, billing_type, features, is_featured, sort_order')
       .eq('is_published', true)
       .order('sort_order', { ascending: true });
 

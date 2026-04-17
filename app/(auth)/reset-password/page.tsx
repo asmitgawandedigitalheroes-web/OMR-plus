@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { PW_RULES, isPasswordValid } from '@/lib/password';
@@ -20,8 +19,11 @@ const XSvg = () => (
   </svg>
 );
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [token, setToken] = useState<string | null>(null);
+  const [tokenMissing, setTokenMissing] = useState(false);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,37 +31,18 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
-  const [sessionReady, setSessionReady] = useState(false);
-  const [sessionError, setSessionError] = useState(false);
 
-  // Supabase sends the recovery token in the URL hash — we need to detect the session
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setSessionReady(true);
-      }
-    });
-
-    // Also check existing session (in case user navigates back after token exchange)
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setSessionReady(true);
-      else {
-        // Give onAuthStateChange a moment to fire
-        setTimeout(() => {
-          setSessionReady(prev => {
-            if (!prev) setSessionError(true);
-            return prev;
-          });
-        }, 2000);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    const t = searchParams.get('token');
+    if (t && t.length > 0) {
+      setToken(t);
+    } else {
+      setTokenMissing(true);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!isPasswordValid(password)) {
       setError('Password does not meet the requirements below.');
       return;
@@ -68,20 +51,26 @@ export default function ResetPasswordPage() {
       setError('Passwords do not match.');
       return;
     }
-
     setError('');
     setLoading(true);
-
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setError(data.error ?? 'Something went wrong. Please try again.');
+        return;
+      }
+      setDone(true);
+      setTimeout(() => router.push('/login'), 3000);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    setDone(true);
-    setTimeout(() => router.push('/login'), 3000);
   };
 
   const pwValid = isPasswordValid(password);
@@ -233,8 +222,8 @@ export default function ResetPasswordPage() {
               </p>
             </div>
 
-            {/* Invalid / expired link */}
-            {sessionError && !sessionReady && (
+            {/* Invalid / missing token */}
+            {tokenMissing && !done && (
               <div className="space-y-5">
                 <div className="rp-error">
                   <svg style={{ width: 14, height: 14, flexShrink: 0 }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -272,15 +261,8 @@ export default function ResetPasswordPage() {
               </div>
             )}
 
-            {/* Loading / waiting for session */}
-            {!sessionReady && !sessionError && !done && (
-              <div className="rp-info">
-                Verifying your reset link…
-              </div>
-            )}
-
             {/* Form */}
-            {sessionReady && !done && (
+            {token && !tokenMissing && !done && (
               <form onSubmit={handleSubmit} className="space-y-5" noValidate>
                 {error && (
                   <div className="rp-error">
@@ -411,5 +393,13 @@ export default function ResetPasswordPage() {
         <Footer />
       </div>
     </>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

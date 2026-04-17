@@ -123,6 +123,18 @@ export default function Footer() {
           color: #C9A84C;
           background: rgba(201,168,76,0.06);
         }
+        /* Disabled state — suppresses all hover feedback */
+        .footer-social--disabled {
+          opacity: 0.28;
+          cursor: not-allowed;
+          border-style: dashed;
+          border-color: rgba(255,255,255,0.07);
+        }
+        .footer-social--disabled:hover {
+          border-color: rgba(255,255,255,0.07);
+          color: rgba(255,255,255,0.35);
+          background: rgba(255,255,255,0.03);
+        }
       `}</style>
 
       <footer className="footer-root">
@@ -147,16 +159,28 @@ export default function Footer() {
                 </p>
                 {/* Socials */}
                 <div className="flex gap-2.5 pt-1">
-                  {/* Instagram — update href when account is ready */}
-                  <span className="footer-social" style={{ cursor: 'default', opacity: 0.4 }} aria-label="Instagram (coming soon)">
+                  {/* Instagram — coming soon, visually disabled */}
+                  <span
+                    className="footer-social footer-social--disabled"
+                    title="Instagram — coming soon"
+                    aria-label="Instagram (coming soon)"
+                    aria-disabled="true"
+                    role="img"
+                  >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                       <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
                       <circle cx="12" cy="12" r="4"/>
                       <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/>
                     </svg>
                   </span>
-                  {/* Twitter / X — update href when account is ready */}
-                  <span className="footer-social" style={{ cursor: 'default', opacity: 0.4 }} aria-label="X / Twitter (coming soon)">
+                  {/* Twitter / X — coming soon, visually disabled */}
+                  <span
+                    className="footer-social footer-social--disabled"
+                    title="X / Twitter — coming soon"
+                    aria-label="X / Twitter (coming soon)"
+                    aria-disabled="true"
+                    role="img"
+                  >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>

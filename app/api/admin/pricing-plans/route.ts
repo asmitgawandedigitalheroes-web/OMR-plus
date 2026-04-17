@@ -19,6 +19,7 @@ const PlanBodySchema = z.object({
   cta_text: z.string().max(50).nullable().optional(),
   cta_text_ar: z.string().max(50).nullable().optional(),
   price_sar: z.number().min(0).max(100000).optional(),
+  billing_type: z.enum(['monthly', 'one_time']).optional(),
   stripe_price_id: z.string().nullable().optional(),
   features: z.array(z.string()).nullable().optional(),
   features_ar: z.array(z.string()).nullable().optional(),

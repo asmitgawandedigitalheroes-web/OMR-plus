@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import { SkMealPlan, SkWorkoutPlan, SkMessages, SkSubscription, SkOrders, SkDashboardInit, SkInline } from '@/components/ui/Skeleton';
+import CustomSelect from '@/components/ui/Select';
 
 /* ─── Icons ──────────────────────────────────────────── */
 const Icons = {
@@ -1108,6 +1109,14 @@ function ProgressTab({ progressLogs, onLogged }: { progressLogs:ProgressLog[]; o
 }
 
 /* ─── Messages Tab ───────────────────────────────────── */
+/** Returns up to 2 initials from a full name, e.g. "Kunal Gawande" → "KG" */
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function MessagesTab() {
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -1130,19 +1139,32 @@ function MessagesTab() {
 
     const init = async () => {
       try {
-        // Find assigned trainer
+        // Find assigned trainer — join profiles in one round-trip so we get the
+        // coach's full_name immediately. Requires the RLS policy
+        // "client_read_assigned_coach" to exist on the profiles table.
         const { data:assign } = await supabase
           .from('trainer_client_assignments')
-          .select('trainer_id')
+          .select('trainer_id, profiles:trainer_id ( full_name )')
           .eq('client_id', user.id)
           .maybeSingle();
 
         if (!assign) { setNoCoach(true); setLoading(false); return; }
         setTrainerId(assign.trainer_id);
 
-        // Get trainer name
-        const { data:tp } = await supabase.from('profiles').select('full_name').eq('id', assign.trainer_id).maybeSingle();
-        if (tp?.full_name) setTrainerName(tp.full_name);
+        // Resolve coach name from join result; fall back to a direct fetch
+        // (works once the "client_read_assigned_coach" RLS policy is applied)
+        const joinedName = (assign.profiles as { full_name?: string } | null)?.full_name;
+        if (joinedName) {
+          setTrainerName(joinedName);
+        } else {
+          // Fallback: direct select — succeeds after the RLS patch is applied
+          const { data:tp } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', assign.trainer_id)
+            .maybeSingle();
+          if (tp?.full_name) setTrainerName(tp.full_name);
+        }
 
         // Find or create thread — table uses coach_id (not trainer_id)
         let tid: string;
@@ -1211,8 +1233,8 @@ function MessagesTab() {
 
       <div className="ds-card cd-chat-box" style={{ display:'flex', flexDirection:'column', height:'clamp(520px, 70vh, 720px)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', padding:'1rem 1.25rem', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ width:36, height:36, borderRadius:'50%', background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', display:'flex', alignItems:'center', justifyContent:'center', color:'#C9A84C', fontWeight:700, fontSize:'0.85rem', flexShrink:0 }}>
-            {trainerName[0]?.toUpperCase()}
+          <div style={{ width:36, height:36, borderRadius:'50%', background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', display:'flex', alignItems:'center', justifyContent:'center', color:'#C9A84C', fontWeight:700, fontSize:'0.75rem', flexShrink:0, letterSpacing:'0.03em' }}>
+            {getInitials(trainerName)}
           </div>
           <div>
             <p style={{ fontSize:'0.85rem', fontWeight:600, color:'white' }}>{trainerName}</p>
@@ -1856,7 +1878,7 @@ function ProfileTab() {
 
   /* ── shared micro-styles ── */
   const inp: CSSProperties = { width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:10, padding:'0.68rem 0.9rem', fontSize:'0.855rem', color:'white', outline:'none', boxSizing:'border-box' };
-  const lbl: CSSProperties = { display:'block', fontSize:'0.67rem', fontWeight:700, color:'rgba(255,255,255,0.38)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'0.4rem' };
+const lbl: CSSProperties = { display:'block', fontSize:'0.67rem', fontWeight:700, color:'rgba(255,255,255,0.38)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'0.4rem' };
   const card: CSSProperties = { background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:16, padding:'1.5rem', marginBottom:'1rem' };
   const sectionTitle: CSSProperties = { fontSize:'0.78rem', fontWeight:700, color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'1.1rem' };
   const grid2: CSSProperties = { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.85rem' };
@@ -1926,12 +1948,17 @@ function ProfileTab() {
             </div>
             <div>
               <span style={lbl}>Gender</span>
-              <select style={{ ...inp, appearance:'none', cursor:'pointer' }} value={gender} onChange={e=>setGender(e.target.value)}>
-                <option value="">Select gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Prefer not to say">Prefer not to say</option>
-              </select>
+              <CustomSelect
+                value={gender}
+                onChange={setGender}
+                placeholder="Select gender"
+                searchable={false}
+                options={[
+                  { value:'Male',              label:'Male' },
+                  { value:'Female',            label:'Female' },
+                  { value:'Prefer not to say', label:'Prefer not to say' },
+                ]}
+              />
             </div>
           </div>
           <div>
@@ -1966,32 +1993,51 @@ function ProfileTab() {
             </div>
             <div>
               <span style={lbl}>Experience Level</span>
-              <select style={{ ...inp, appearance:'none', cursor:'pointer' }} value={experience} onChange={e=>setExperience(e.target.value)}>
-                <option value="">Select level</option>
-                <option value="Beginner">Beginner (under 1 year)</option>
-                <option value="Intermediate">Intermediate (1–3 years)</option>
-                <option value="Advanced">Advanced (3+ years)</option>
-              </select>
+              <CustomSelect
+                value={experience}
+                onChange={setExperience}
+                placeholder="Select level"
+                searchable={false}
+                options={[
+                  { value:'Beginner',     label:'Beginner (under 1 year)' },
+                  { value:'Intermediate', label:'Intermediate (1–3 years)' },
+                  { value:'Advanced',     label:'Advanced (3+ years)' },
+                ]}
+              />
             </div>
           </div>
           <div>
             <span style={lbl}>Primary Fitness Goal</span>
-            <select style={{ ...inp, appearance:'none', cursor:'pointer' }} value={fitnessGoal} onChange={e=>setFitnessGoal(e.target.value)}>
-              <option value="">Select goal</option>
-              {['Lose Weight','Build Muscle','Improve Fitness','Increase Strength','Improve Endurance','Body Recomposition','Maintain Weight','Improve Flexibility'].map(g=>(
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
+            {/* Values must match the onboarding chip values exactly so saved data pre-populates */}
+            <CustomSelect
+              value={fitnessGoal}
+              onChange={setFitnessGoal}
+              placeholder="Select goal"
+              searchable={false}
+              options={[
+                { value:'Muscle Building', label:'Muscle Building' },
+                { value:'Fat Loss',        label:'Fat Loss' },
+                { value:'Summer Body',     label:'Summer Body' },
+                { value:'General Fitness', label:'General Fitness' },
+                { value:'Workout Only',    label:'Workout Only' },
+                { value:'Meal Plan Only',  label:'Meal Plan Only' },
+              ]}
+            />
           </div>
           <div>
             <span style={lbl}>Activity Level</span>
-            <select style={{ ...inp, appearance:'none', cursor:'pointer' }} value={activityLevel} onChange={e=>setActivityLevel(e.target.value)}>
-              <option value="">Select activity level</option>
-              <option value="Sedentary (desk job)">Sedentary — desk job, little movement</option>
-              <option value="Lightly Active (1–3x/week)">Lightly Active — 1–3x per week</option>
-              <option value="Moderately Active (3–5x/week)">Moderately Active — 3–5x per week</option>
-              <option value="Very Active (6–7x/week)">Very Active — 6–7x per week</option>
-            </select>
+            <CustomSelect
+              value={activityLevel}
+              onChange={setActivityLevel}
+              placeholder="Select activity level"
+              searchable={false}
+              options={[
+                { value:'Sedentary (desk job)',          label:'Sedentary — desk job, little movement' },
+                { value:'Lightly Active (1–3x/week)',    label:'Lightly Active — 1–3x per week' },
+                { value:'Moderately Active (3–5x/week)', label:'Moderately Active — 3–5x per week' },
+                { value:'Very Active (6–7x/week)',       label:'Very Active — 6–7x per week' },
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -2168,8 +2214,9 @@ export default function ClientDashboard() {
   const loadData = useCallback(async () => {
     if (!user?.id) return;
     const [mp, wp, logs] = await Promise.all([
-      supabase.from('meal_plans').select('id, title, meal_plan_items(*)').eq('client_id', user.id).order('created_at',{ascending:false}).limit(1).single(),
-      supabase.from('workout_plans').select('id, title, workout_plan_days(id, day_label, focus, sort_order, workout_exercises(*))').eq('client_id', user.id).order('created_at',{ascending:false}).limit(1).single(),
+      // .maybeSingle() instead of .single() — returns null (not 406) when no plan assigned yet
+      supabase.from('meal_plans').select('id, title, meal_plan_items(*)').eq('client_id', user.id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
+      supabase.from('workout_plans').select('id, title, workout_plan_days(id, day_label, focus, sort_order, workout_exercises(*))').eq('client_id', user.id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
       supabase.from('progress_logs').select('*').eq('user_id', user.id).order('logged_at',{ascending:false}).limit(30),
     ]);
     if (mp.data) setMealPlan(mp.data as unknown as MealPlan);

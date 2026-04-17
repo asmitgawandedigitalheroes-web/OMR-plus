@@ -13,6 +13,7 @@ interface PublicPlan {
   tagline: string | null;
   cta_text: string | null;
   price_sar: number;
+  billing_type: 'monthly' | 'one_time';
   features: string[];
   is_featured: boolean;
   sort_order: number;
@@ -175,9 +176,9 @@ function CheckoutContent() {
               {isRTL ? 'ابدأ تحولك اليوم' : 'Start Your Transformation'}
             </h1>
             <p className="text-white/40 text-sm max-w-md mx-auto">
-              {isRTL
-                ? 'اشتراك شهري قابل للإلغاء في أي وقت. لا رسوم خفية.'
-                : 'Monthly subscription. Cancel anytime. No hidden fees.'}
+              {selectedPlan?.billing_type === 'one_time'
+                ? (isRTL ? 'دفعة واحدة. بدون رسوم متكررة.' : 'One-time payment. No recurring charges.')
+                : (isRTL ? 'اشتراك شهري قابل للإلغاء في أي وقت. لا رسوم خفية.' : 'Monthly subscription. Cancel anytime. No hidden fees.')}
             </p>
           </div>
 
@@ -238,7 +239,11 @@ function CheckoutContent() {
 
                     <div className="mb-4" dir="ltr">
                       <span className="text-3xl font-black text-white">{plan.price_sar}</span>
-                      <span className="text-white/40 text-sm ml-1">AED{isRTL ? '/شهر' : '/mo'}</span>
+                      <span className="text-white/40 text-sm ml-1">
+                        {plan.billing_type === 'one_time'
+                          ? (isRTL ? ' درهم' : ' AED')
+                          : (isRTL ? ' درهم/شهر' : ' AED/mo')}
+                      </span>
                     </div>
 
                     <ul className="space-y-2">
@@ -264,7 +269,11 @@ function CheckoutContent() {
                     </div>
                     <div className="flex justify-between items-center mb-1 text-sm">
                       <span className="text-white/50">{isRTL ? 'الفترة' : 'Billing'}</span>
-                      <span className="text-white/70">{isRTL ? 'شهري' : 'Monthly'}</span>
+                      <span className="text-white/70">
+                        {selectedPlan?.billing_type === 'one_time'
+                          ? (isRTL ? 'مرة واحدة' : 'One-Time')
+                          : (isRTL ? 'شهري' : 'Monthly')}
+                      </span>
                     </div>
                     <div className="h-px my-3" style={{ background: 'rgba(255,255,255,0.06)' }} />
                     <div className="flex justify-between items-center">

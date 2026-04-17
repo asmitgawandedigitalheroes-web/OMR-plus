@@ -14,6 +14,7 @@ interface PublicPlan {
   tagline: string | null;
   cta_text: string | null;
   price_sar: number;
+  billing_type: 'monthly' | 'one_time';
   features: string[];
   is_featured: boolean;
   sort_order: number;
@@ -199,7 +200,10 @@ export default function PricingPage() {
                       <div className="flex items-baseline gap-1.5 mb-4" dir="ltr">
                         <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.4)' }}>AED</span>
                         <span className="text-4xl sm:text-5xl font-black" style={{ color: '#C9A84C' }}>{plan.price_sar}</span>
-                        <span className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>{isRTL ? '/شهر' : '/month'}</span>
+                        {plan.billing_type === 'one_time'
+                          ? <span className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>{isRTL ? 'مرة واحدة' : 'one-time'}</span>
+                          : <span className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>{isRTL ? '/شهر' : '/month'}</span>
+                        }
                       </div>
 
                       {/* Description */}
